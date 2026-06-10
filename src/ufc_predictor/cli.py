@@ -6,6 +6,7 @@ from typing import Optional
 import pandas as pd
 
 from ufc_predictor.config import settings
+from ufc_predictor.data_io import InputDataError, read_optional_csv, read_required_csv
 
 try:
     import typer
@@ -46,10 +47,26 @@ else:
     console = Console()
 
 
-def _read_optional_csv(path: Path) -> pd.DataFrame | None:
-    if not path.exists():
-        return None
-    return pd.read_csv(path)
+REQUIRED_FIGHT_COLUMNS = ["fighter_a", "fighter_b", "fight_date", "winner"]
+
+
+def _print(message: str) -> None:
+    if console is not None:
+        console.print(message)
+    else:  # pragma: no cover - only used without CLI deps
+        print(message)
+
+
+def _print_json(data: dict) -> None:
+    if console is not None:
+        console.print_json(data=data)
+    else:  # pragma: no cover - only used without CLI deps
+        print(data)
+
+
+def _cli_error(message: str) -> None:
+    _print(f"[red]{message}[/red]" if console is not None else message)
+    raise typer.BadParameter(message)
 
 
 def _read_dataset(path: Path) -> pd.DataFrame:
@@ -59,9 +76,9 @@ def _read_dataset(path: Path) -> pd.DataFrame:
         except Exception:
             csv_fallback = path.with_suffix(".csv")
             if csv_fallback.exists():
-                return pd.read_csv(csv_fallback)
+                return read_required_csv(csv_fallback, label="processed fight dataset")
             raise
-    return pd.read_csv(path)
+    return read_required_csv(path, label="processed fight dataset")
 
 
 def _default_dataset_path() -> Path:
@@ -76,7 +93,7 @@ def init_db() -> None:
 
     settings.ensure_directories()
     initialize_database()
-    console.print(f"Initialized database at {settings.database_path}")
+    _print(f"Initialized database at {settings.database_path}")
 
 
 @app.command("ingest-ufcstats")
@@ -84,14 +101,36 @@ def ingest_ufcstats(
     max_events: Optional[int] = typer.Option(None, help="Limit event pages for a small/resumable run."),
     output_dir: Path = typer.Option(settings.raw_data_dir, help="Where raw CSV files should be written."),
     include_details: bool = typer.Option(False, help="Also parse fight detail and fighter profile pages."),
+    ignore_resume: bool = typer.Option(False, help="Ignore the local UFCStats resume file."),
+    sample_on_failure: bool = typer.Option(
+        True,
+        "--sample-on-failure/--no-sample-on-failure",
+        help="Write bundled sample data if live UFCStats scraping fails.",
+    ),
 ) -> None:
-    from ufc_predictor.ingest.ufcstats_scraper import UFCStatsScraper
+    from ufc_predictor.ingest.ufcstats_scraper import UFCStatsScraper, UFCStatsScraperError
+    from ufc_predictor.sample_data import write_sample_data
 
     settings.ensure_directories()
-    paths = UFCStatsScraper().run_to_csv(output_dir=output_dir, max_events=max_events, include_details=include_details)
-    console.print("Wrote UFCStats CSV files:")
+    try:
+        paths = UFCStatsScraper().run_to_csv(
+            output_dir=output_dir,
+            max_events=max_events,
+            include_details=include_details,
+            ignore_resume=ignore_resume,
+        )
+        _print("Wrote UFCStats CSV files:")
+    except UFCStatsScraperError as exc:
+        if not sample_on_failure:
+            _cli_error(str(exc))
+        _print(f"[yellow]UFCStats ingestion did not produce live data: {exc}[/yellow]")
+        _print(
+            "[yellow]Writing bundled sample/dev data instead so the MVP pipeline can run. "
+            "Use --no-sample-on-failure for strict live scraping.[/yellow]"
+        )
+        paths = write_sample_data(output_dir)
     for name, path in paths.items():
-        console.print(f"- {name}: {path}")
+        _print(f"- {name}: {path}")
 
 
 @app.command("load-scorecards")
@@ -101,7 +140,7 @@ def load_scorecards(
     from ufc_predictor.ingest.scorecards_loader import import_scorecards
 
     frame = import_scorecards(csv_path)
-    console.print(f"Imported {len(frame)} scorecard rows.")
+    _print(f"Imported {len(frame)} scorecard rows.")
 
 
 @app.command("build-dataset")
@@ -113,15 +152,23 @@ def build_dataset(
     output: Path = typer.Option(settings.processed_data_dir / "fight_dataset.parquet", help="Output dataset path."),
     two_way: bool = typer.Option(False, help="Create both fighter orderings for each fight."),
     randomize_order: bool = typer.Option(False, help="Randomize fighter order once per fight."),
+    use_sample_data: bool = typer.Option(False, help="Build from the bundled sample/dev dataset."),
 ) -> None:
     from ufc_predictor.features.build_fight_dataset import build_fight_dataset, save_dataset
+    from ufc_predictor.sample_data import load_sample_data, write_sample_data
 
-    if not fights_csv.exists():
-        raise typer.BadParameter(f"Could not find fights CSV at {fights_csv}")
-    fights = pd.read_csv(fights_csv)
-    fight_stats = _read_optional_csv(fight_stats_csv)
-    fighters = _read_optional_csv(fighters_csv)
-    scorecards = _read_optional_csv(scorecards_csv)
+    if use_sample_data:
+        fights, fighters, fight_stats, scorecards = load_sample_data()
+        write_sample_data(settings.raw_data_dir)
+        _print("Using bundled sample/dev data for dataset build.")
+    else:
+        try:
+            fights = read_required_csv(fights_csv, required_columns=REQUIRED_FIGHT_COLUMNS, label="fights CSV")
+        except InputDataError as exc:
+            _cli_error(str(exc))
+        fight_stats = read_optional_csv(fight_stats_csv, label="fight stats CSV")
+        fighters = read_optional_csv(fighters_csv, label="fighters CSV")
+        scorecards = read_optional_csv(scorecards_csv, label="scorecards CSV")
     dataset = build_fight_dataset(
         fights=fights,
         fight_stats=fight_stats,
@@ -131,7 +178,7 @@ def build_dataset(
         randomize_order=randomize_order,
     )
     path = save_dataset(dataset, output)
-    console.print(f"Wrote {len(dataset)} training rows to {path}")
+    _print(f"Wrote {len(dataset)} training rows to {path}")
 
 
 @app.command("train")
@@ -144,8 +191,8 @@ def train(
     dataset = _read_dataset(dataset_path)
     bundle = train_ensemble(dataset, model_dir=model_dir, save=False)
     model_path = save_model_bundle(bundle, model_dir=model_dir)
-    console.print(f"Saved model to {model_path}")
-    console.print_json(data=bundle.metrics)
+    _print(f"Saved model to {model_path}")
+    _print_json(bundle.metrics)
 
 
 @app.command("backtest")
@@ -159,8 +206,8 @@ def backtest(
     dataset = _read_dataset(dataset_path)
     metrics = rolling_backtest(dataset, min_train_fights=min_train_fights)
     path = save_backtest_result(metrics, output)
-    console.print(f"Wrote backtest metrics to {path}")
-    console.print_json(data=metrics)
+    _print(f"Wrote backtest metrics to {path}")
+    _print_json(metrics)
 
 
 @app.command("predict")
@@ -178,12 +225,12 @@ def predict(
 ) -> None:
     from ufc_predictor.models.predict import predict_fight
 
-    fights = _read_optional_csv(fights_csv)
+    fights = read_optional_csv(fights_csv, label="fights CSV")
     if fights is None:
         fights = pd.DataFrame()
-    fight_stats = _read_optional_csv(fight_stats_csv)
-    fighters = _read_optional_csv(fighters_csv)
-    scorecards = _read_optional_csv(scorecards_csv)
+    fight_stats = read_optional_csv(fight_stats_csv, label="fight stats CSV")
+    fighters = read_optional_csv(fighters_csv, label="fighters CSV")
+    scorecards = read_optional_csv(scorecards_csv, label="scorecards CSV")
     model = model_path if model_path.exists() else None
     prediction = predict_fight(
         model=model,
@@ -197,7 +244,7 @@ def predict(
         fighters=fighters,
         scorecards=scorecards,
     )
-    console.print_json(data=prediction)
+    _print_json(prediction)
 
 
 if __name__ == "__main__":  # pragma: no cover

@@ -10,6 +10,49 @@ from typing import Any
 import pandas as pd
 
 from ufc_predictor.config import settings
+from ufc_predictor.data_io import InputDataError, inspect_csv
+
+
+class UFCStatsScraperError(RuntimeError):
+    """Raised when UFCStats scraping cannot produce a usable raw dataset."""
+
+
+EVENT_COLUMNS = ["name", "event_date", "location", "source_url", "raw_details"]
+FIGHT_COLUMNS = [
+    "fight_id",
+    "event_name",
+    "fight_date",
+    "event_location",
+    "fighter_a",
+    "fighter_b",
+    "winner",
+    "weight_class",
+    "method",
+    "finish_round",
+    "finish_time",
+    "scheduled_rounds",
+    "source_url",
+]
+FIGHT_STAT_COLUMNS = [
+    "fight_id",
+    "source_url",
+    "fighter",
+    "opponent",
+    "knockdowns",
+    "sig_str_landed",
+    "sig_str_attempted",
+    "total_str_landed",
+    "total_str_attempted",
+    "takedowns_landed",
+    "takedowns_attempted",
+    "submission_attempts",
+    "reversals",
+    "control_seconds",
+    "head_landed",
+    "body_landed",
+    "leg_landed",
+]
+FIGHTER_COLUMNS = ["name", "stance", "height_in", "weight_lb", "reach_in", "date_of_birth", "record", "source_url"]
 
 
 def _slug(value: str) -> str:
@@ -68,7 +111,7 @@ class UFCStatsScraper:
     delay_seconds: float = settings.scrape_delay_seconds
     retry_count: int = settings.retry_count
     timeout_seconds: int = settings.request_timeout_seconds
-    base_url: str = "http://ufcstats.com"
+    base_url: str = "https://www.ufcstats.com"
     session: Any = field(default=None, init=False)
     _last_request_at: float = field(default=0.0, init=False)
 
@@ -93,7 +136,10 @@ class UFCStatsScraper:
 
         cache_path = self._cache_path(url)
         if cache_path.exists() and not force:
-            return cache_path.read_text(encoding="utf-8")
+            cached = cache_path.read_text(encoding="utf-8")
+            if cached.strip():
+                return cached
+            cache_path.unlink(missing_ok=True)
         elapsed = time.monotonic() - self._last_request_at
         if elapsed < self.delay_seconds:
             time.sleep(self.delay_seconds - elapsed)
@@ -109,7 +155,10 @@ class UFCStatsScraper:
             except Exception as exc:  # pragma: no cover - network dependent
                 last_error = exc
                 time.sleep(min(2**attempt, 10))
-        raise RuntimeError(f"Failed to fetch {url}") from last_error
+        raise UFCStatsScraperError(
+            f"Failed to fetch {url}. Check network access, UFCStats availability, "
+            "and the local scraper cache under data/raw/cache."
+        ) from last_error
 
     def soup(self, url: str) -> Any:
         try:
@@ -122,11 +171,18 @@ class UFCStatsScraper:
         suffix = "statistics/events/completed?page=all" if completed_only else "statistics/events/search?page=all"
         soup = self.soup(f"{self.base_url}/{suffix}")
         links: list[str] = []
-        for anchor in soup.select("a.b-link.b-link_style_black"):
+        for anchor in soup.select('a[href*="/event-details/"]'):
             href = anchor.get("href")
             if href and "/event-details/" in href:
                 links.append(href)
-        return list(dict.fromkeys(links))
+        links = list(dict.fromkeys(links))
+        if not links:
+            raise UFCStatsScraperError(
+                "No UFCStats event links were found on the completed-events page. "
+                "The site layout may have changed, the response may be blocked, or "
+                "a stale/empty cache file may be present under data/raw/cache."
+            )
+        return links
 
     def scrape_event(self, event_url: str) -> dict[str, Any]:
         soup = self.soup(event_url)
@@ -145,14 +201,17 @@ class UFCStatsScraper:
         fights = []
         for row in soup.select("tr.b-fight-details__table-row.b-fight-details__table-row__hover"):
             fight_link = row.get("data-link") or ""
-            cells = [_clean_text(cell) for cell in row.select("td")]
+            cells = row.select("td")
             if len(cells) < 10:
                 continue
-            fighters = [name.strip() for name in cells[1].split("  ") if name.strip()]
-            winners = row.select(".b-flag__text")
+            cell_text = [_clean_text(cell) for cell in cells]
+            statuses = [value.lower() for value in _pair_values(cells[0])]
+            fighters = _pair_values(cells[1])
             winner = ""
-            if winners:
-                winner = _clean_text(winners[0])
+            if "win" in statuses:
+                winner_index = statuses.index("win")
+                if winner_index < len(fighters):
+                    winner = fighters[winner_index]
             fights.append(
                 {
                     "event_name": title,
@@ -161,11 +220,11 @@ class UFCStatsScraper:
                     "fighter_a": fighters[0] if fighters else "",
                     "fighter_b": fighters[1] if len(fighters) > 1 else "",
                     "winner": winner,
-                    "weight_class": cells[6] if len(cells) > 6 else "",
-                    "method": cells[7] if len(cells) > 7 else "",
-                    "finish_round": cells[8] if len(cells) > 8 else "",
-                    "finish_time": cells[9] if len(cells) > 9 else "",
-                    "scheduled_rounds": cells[10] if len(cells) > 10 else "",
+                    "weight_class": cell_text[6] if len(cell_text) > 6 else "",
+                    "method": cell_text[7] if len(cell_text) > 7 else "",
+                    "finish_round": cell_text[8] if len(cell_text) > 8 else "",
+                    "finish_time": cell_text[9] if len(cell_text) > 9 else "",
+                    "scheduled_rounds": 5 if "title" in title.lower() else 3,
                     "source_url": fight_link,
                 }
             )
@@ -286,6 +345,7 @@ class UFCStatsScraper:
         self,
         max_events: int | None = None,
         resume_file: str | Path | None = None,
+        ignore_resume: bool = False,
     ) -> tuple[pd.DataFrame, pd.DataFrame]:
         """Scrape event and fight-card rows.
 
@@ -295,7 +355,7 @@ class UFCStatsScraper:
 
         resume_path = Path(resume_file) if resume_file else self.cache_dir / "ufcstats_resume.json"
         completed: set[str] = set()
-        if resume_path.exists():
+        if resume_path.exists() and not ignore_resume:
             completed = set(json.loads(resume_path.read_text(encoding="utf-8")))
 
         event_rows: list[dict[str, Any]] = []
@@ -307,24 +367,49 @@ class UFCStatsScraper:
             if link in completed:
                 continue
             payload = self.scrape_event(link)
+            if not payload["fights"]:
+                continue
             event_rows.append(payload["event"])
             fight_rows.extend(payload["fights"])
             completed.add(link)
             resume_path.write_text(json.dumps(sorted(completed), indent=2), encoding="utf-8")
-        return pd.DataFrame(event_rows), pd.DataFrame(fight_rows)
+        events = pd.DataFrame(event_rows, columns=EVENT_COLUMNS)
+        fights = pd.DataFrame(fight_rows)
+        if fights.empty:
+            raise UFCStatsScraperError(
+                "UFCStats scraping completed but produced zero fight rows. The event-page "
+                "parser may need updating, all requested events may be marked complete in "
+                "the resume file, or cached pages may be stale. Check data/raw/cache or "
+                "rerun with --ignore-resume."
+            )
+        return events, fights
 
     def run_to_csv(
         self,
         output_dir: str | Path | None = None,
         max_events: int | None = None,
         include_details: bool = False,
+        ignore_resume: bool = False,
     ) -> dict[str, Path]:
         output = Path(output_dir) if output_dir else settings.raw_data_dir
         output.mkdir(parents=True, exist_ok=True)
-        events, fights = self.scrape_events(max_events=max_events)
+        events, fights = self.scrape_events(max_events=max_events, ignore_resume=ignore_resume)
         if not fights.empty and "fight_id" not in fights.columns:
             fights = fights.reset_index(drop=True)
             fights["fight_id"] = fights.index
+        for column in FIGHT_COLUMNS:
+            if column not in fights.columns:
+                fights[column] = ""
+        fights = fights[FIGHT_COLUMNS]
+        if fights.empty:
+            raise UFCStatsScraperError("UFCStats scraping produced no fights; refusing to write an empty fights.csv.")
+        if fights[["fighter_a", "fighter_b", "fight_date"]].isna().any().any() or (
+            fights[["fighter_a", "fighter_b", "fight_date"]].astype(str).apply(lambda column: column.str.strip()).eq("").any().any()
+        ):
+            raise UFCStatsScraperError(
+                "UFCStats scraping produced fight rows with missing fighter names or dates; "
+                "refusing to write an invalid fights.csv."
+            )
         fight_stats_rows: list[dict[str, Any]] = []
         fighter_rows: dict[str, dict[str, Any]] = {}
         if include_details and not fights.empty and "source_url" in fights.columns:
@@ -343,11 +428,15 @@ class UFCStatsScraper:
             "events": output / "events.csv",
             "fights": output / "fights.csv",
         }
-        events.to_csv(paths["events"], index=False)
+        events.reindex(columns=EVENT_COLUMNS).to_csv(paths["events"], index=False)
         fights.to_csv(paths["fights"], index=False)
+        try:
+            inspect_csv(paths["fights"], required_columns=["fighter_a", "fighter_b", "fight_date"], label="UFCStats fights CSV")
+        except InputDataError as exc:
+            raise UFCStatsScraperError(str(exc)) from exc
         if include_details:
             paths["fight_stats"] = output / "fight_stats.csv"
             paths["fighters"] = output / "fighters.csv"
-            pd.DataFrame(fight_stats_rows).to_csv(paths["fight_stats"], index=False)
-            pd.DataFrame(fighter_rows.values()).to_csv(paths["fighters"], index=False)
+            pd.DataFrame(fight_stats_rows, columns=FIGHT_STAT_COLUMNS).to_csv(paths["fight_stats"], index=False)
+            pd.DataFrame(fighter_rows.values(), columns=FIGHTER_COLUMNS).to_csv(paths["fighters"], index=False)
         return paths

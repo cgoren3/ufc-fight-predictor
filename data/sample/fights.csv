@@ -1,0 +1,17 @@
+fight_id,event_id,event_name,fight_date,event_location,fighter_a,fighter_b,winner,method,finish_round,finish_time,weight_class,scheduled_rounds,main_event,title_fight,catchweight,missed_weight,short_notice_replacement,source_url
+1,1,Sample FC 1,2021-01-15,Las Vegas Nevada USA,Aiden Wolfe,Bruno Vale,Aiden Wolfe,Decision - Unanimous,3,5:00,Lightweight,3,0,0,0,0,0,sample://fight/1
+2,1,Sample FC 1,2021-01-15,Las Vegas Nevada USA,Casey North,Darius King,Darius King,KO/TKO,2,3:12,Welterweight,3,0,0,0,0,0,sample://fight/2
+3,2,Sample FC 2,2021-05-22,Austin Texas USA,Elias Stone,Felix Cruz,Elias Stone,Submission,1,4:18,Featherweight,3,0,0,0,0,0,sample://fight/3
+4,2,Sample FC 2,2021-05-22,Austin Texas USA,Gavin Holt,Mateo Silva,Mateo Silva,Decision - Split,3,5:00,Middleweight,3,1,0,0,0,0,sample://fight/4
+5,3,Sample FC 3,2021-10-09,Toronto Ontario Canada,Bruno Vale,Felix Cruz,Bruno Vale,KO/TKO,1,2:44,Lightweight,3,0,0,0,0,0,sample://fight/5
+6,3,Sample FC 3,2021-10-09,Toronto Ontario Canada,Aiden Wolfe,Darius King,Aiden Wolfe,Decision - Unanimous,3,5:00,Welterweight,3,1,0,0,0,0,sample://fight/6
+7,4,Sample FC 4,2022-03-05,Rio de Janeiro Brazil,Casey North,Mateo Silva,Casey North,Submission,2,1:36,Middleweight,3,0,0,0,0,0,sample://fight/7
+8,4,Sample FC 4,2022-03-05,Rio de Janeiro Brazil,Elias Stone,Gavin Holt,Gavin Holt,Decision - Unanimous,3,5:00,Featherweight,3,1,0,0,0,0,sample://fight/8
+9,5,Sample FC 5,2022-08-20,Las Vegas Nevada USA,Aiden Wolfe,Casey North,Casey North,Decision - Split,3,5:00,Welterweight,3,0,0,0,0,0,sample://fight/9
+10,5,Sample FC 5,2022-08-20,Las Vegas Nevada USA,Darius King,Bruno Vale,Darius King,KO/TKO,2,0:59,Lightweight,3,1,0,0,0,0,sample://fight/10
+11,6,Sample FC 6,2023-02-11,Mexico City Mexico,Felix Cruz,Elias Stone,Felix Cruz,Decision - Unanimous,3,5:00,Featherweight,3,0,0,0,0,0,sample://fight/11
+12,6,Sample FC 6,2023-02-11,Mexico City Mexico,Mateo Silva,Gavin Holt,Mateo Silva,Submission,3,2:21,Middleweight,3,1,0,0,0,0,sample://fight/12
+13,7,Sample FC 7,2023-09-30,New York New York USA,Aiden Wolfe,Darius King,Darius King,Decision - Majority,5,5:00,Welterweight,5,1,1,0,0,0,sample://fight/13
+14,7,Sample FC 7,2023-09-30,New York New York USA,Bruno Vale,Casey North,Bruno Vale,Submission,2,4:03,Lightweight,3,0,0,0,0,1,sample://fight/14
+15,8,Sample FC 8,2024-04-13,Las Vegas Nevada USA,Elias Stone,Mateo Silva,Mateo Silva,KO/TKO,1,1:48,Featherweight,3,0,0,0,0,0,sample://fight/15
+16,8,Sample FC 8,2024-04-13,Las Vegas Nevada USA,Gavin Holt,Felix Cruz,Gavin Holt,Decision - Unanimous,3,5:00,Middleweight,3,1,0,0,0,0,sample://fight/16

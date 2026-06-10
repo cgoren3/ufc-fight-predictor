@@ -9,6 +9,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+from pandas.api.types import is_numeric_dtype
 
 from ufc_predictor.config import settings
 from ufc_predictor.features.build_fight_dataset import feature_columns
@@ -71,8 +72,8 @@ def _imports():
 
 def _split_features(frame: pd.DataFrame) -> tuple[list[str], list[str], list[str]]:
     columns = feature_columns(frame)
-    categorical = [column for column in columns if frame[column].dtype == "object" or str(frame[column].dtype).startswith("string")]
-    numeric = [column for column in columns if column not in categorical]
+    numeric = [column for column in columns if is_numeric_dtype(frame[column])]
+    categorical = [column for column in columns if column not in numeric]
     return columns, numeric, categorical
 
 

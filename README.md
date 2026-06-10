@@ -48,7 +48,17 @@ To also parse fight-detail pages and fighter profiles:
 ufc-predict ingest-ufcstats --include-details
 ```
 
-The scraper uses a user-agent header, local HTML cache, request retries, a configurable delay, and a resume file. It should not be used aggressively.
+The scraper uses a user-agent header, local HTML cache, request retries, a configurable delay, and a resume file. It should not be used aggressively. If live UFCStats ingestion cannot produce valid fight rows, the command prints a clear warning and, by default, writes the bundled sample/dev data so the MVP pipeline can still run. Use strict mode when you do not want this fallback:
+
+```bash
+ufc-predict ingest-ufcstats --no-sample-on-failure
+```
+
+If a stale resume file or bad cached page is suspected:
+
+```bash
+ufc-predict ingest-ufcstats --ignore-resume
+```
 
 ## Manual Data
 
@@ -78,6 +88,14 @@ The project runs without the key.
 
 ```bash
 ufc-predict build-dataset
+```
+
+`build-dataset` validates that `data/raw/fights.csv` exists, has headers, and has at least one data row before pandas reads it. If the file is missing, empty, headers-only, or missing required columns, the command explains the problem and points you to ingestion/cache checks or sample data.
+
+For a fully local development run:
+
+```bash
+ufc-predict build-dataset --use-sample-data
 ```
 
 Every training row is a fighter matchup as of the fight date. For historical rows, features are computed only from fights with `fight_date` strictly before the target fight. Same-day, future, final-career, closing-result, and post-fight information are not used.
