@@ -1,0 +1,216 @@
+from __future__ import annotations
+
+import json
+import pickle
+from dataclasses import dataclass, field
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+import pandas as pd
+
+from ufc_predictor.config import settings
+from ufc_predictor.features.build_fight_dataset import feature_columns
+from ufc_predictor.models.calibrate import calibrate_estimator
+from ufc_predictor.models.evaluate import baseline_metrics, evaluate_predictions
+
+
+@dataclass
+class TrainedModelBundle:
+    model_version: str
+    estimators: list[Any]
+    feature_columns: list[str]
+    numeric_features: list[str]
+    categorical_features: list[str]
+    metrics: dict[str, Any] = field(default_factory=dict)
+    created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+
+    def _align(self, frame: pd.DataFrame) -> pd.DataFrame:
+        aligned = frame.copy()
+        for column in self.feature_columns:
+            if column not in aligned.columns:
+                aligned[column] = np.nan
+        return aligned[self.feature_columns]
+
+    def predict_proba(self, frame: pd.DataFrame) -> np.ndarray:
+        aligned = self._align(frame)
+        if not self.estimators:
+            raise RuntimeError("Model bundle has no estimators.")
+        probabilities = []
+        for estimator in self.estimators:
+            proba = estimator.predict_proba(aligned)
+            probabilities.append(proba)
+        average = np.mean(probabilities, axis=0)
+        row_sums = average.sum(axis=1, keepdims=True)
+        row_sums[row_sums == 0] = 1.0
+        return average / row_sums
+
+
+def _imports():
+    try:
+        from sklearn.compose import ColumnTransformer
+        from sklearn.ensemble import HistGradientBoostingClassifier, RandomForestClassifier
+        from sklearn.impute import SimpleImputer
+        from sklearn.linear_model import LogisticRegression
+        from sklearn.pipeline import Pipeline
+        from sklearn.preprocessing import OneHotEncoder, StandardScaler
+    except Exception as exc:  # pragma: no cover - dependency path
+        raise RuntimeError("scikit-learn is required for training. Install project dependencies.") from exc
+    return {
+        "ColumnTransformer": ColumnTransformer,
+        "HistGradientBoostingClassifier": HistGradientBoostingClassifier,
+        "RandomForestClassifier": RandomForestClassifier,
+        "SimpleImputer": SimpleImputer,
+        "LogisticRegression": LogisticRegression,
+        "Pipeline": Pipeline,
+        "OneHotEncoder": OneHotEncoder,
+        "StandardScaler": StandardScaler,
+    }
+
+
+def _split_features(frame: pd.DataFrame) -> tuple[list[str], list[str], list[str]]:
+    columns = feature_columns(frame)
+    categorical = [column for column in columns if frame[column].dtype == "object" or str(frame[column].dtype).startswith("string")]
+    numeric = [column for column in columns if column not in categorical]
+    return columns, numeric, categorical
+
+
+def _preprocessor(numeric: list[str], categorical: list[str], scale_numeric: bool):
+    sk = _imports()
+    numeric_steps = [("imputer", sk["SimpleImputer"](strategy="median"))]
+    if scale_numeric:
+        numeric_steps.append(("scaler", sk["StandardScaler"]()))
+    categorical_pipeline = sk["Pipeline"](
+        steps=[
+            ("imputer", sk["SimpleImputer"](strategy="most_frequent")),
+            ("onehot", sk["OneHotEncoder"](handle_unknown="ignore", sparse_output=False)),
+        ]
+    )
+    return sk["ColumnTransformer"](
+        transformers=[
+            ("numeric", sk["Pipeline"](numeric_steps), numeric),
+            ("categorical", categorical_pipeline, categorical),
+        ],
+        remainder="drop",
+        verbose_feature_names_out=False,
+    )
+
+
+def _pipeline(estimator: Any, numeric: list[str], categorical: list[str], scale_numeric: bool):
+    sk = _imports()
+    return sk["Pipeline"]([("preprocess", _preprocessor(numeric, categorical, scale_numeric)), ("model", estimator)])
+
+
+def _candidate_estimators(random_state: int = 42) -> list[tuple[str, Any, bool]]:
+    sk = _imports()
+    candidates: list[tuple[str, Any, bool]] = [
+        ("logistic_regression", sk["LogisticRegression"](max_iter=2000, class_weight="balanced"), True),
+        (
+            "random_forest",
+            sk["RandomForestClassifier"](n_estimators=300, min_samples_leaf=3, random_state=random_state, n_jobs=-1),
+            False,
+        ),
+    ]
+    try:
+        from xgboost import XGBClassifier
+
+        candidates.append(
+            (
+                "xgboost",
+                XGBClassifier(
+                    n_estimators=300,
+                    max_depth=3,
+                    learning_rate=0.04,
+                    subsample=0.9,
+                    colsample_bytree=0.9,
+                    eval_metric="logloss",
+                    random_state=random_state,
+                ),
+                False,
+            )
+        )
+    except Exception:
+        candidates.append(
+            (
+                "hist_gradient_boosting",
+                sk["HistGradientBoostingClassifier"](learning_rate=0.04, max_iter=250, random_state=random_state),
+                False,
+            )
+        )
+    return candidates
+
+
+def chronological_split(
+    dataset: pd.DataFrame,
+    test_fraction: float = 0.20,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    frame = dataset.sort_values("fight_date").reset_index(drop=True)
+    if len(frame) < 5:
+        return frame, frame.iloc[0:0].copy()
+    split_at = max(int(len(frame) * (1.0 - test_fraction)), 1)
+    return frame.iloc[:split_at].copy(), frame.iloc[split_at:].copy()
+
+
+def train_ensemble(
+    dataset: pd.DataFrame,
+    model_dir: str | Path | None = None,
+    calibration_method: str = "sigmoid",
+    test_fraction: float = 0.20,
+    random_state: int = 42,
+    save: bool = True,
+) -> TrainedModelBundle:
+    if dataset.empty:
+        raise ValueError("Cannot train on an empty dataset.")
+    train_frame, test_frame = chronological_split(dataset, test_fraction=test_fraction)
+    if train_frame["fighter_a_win"].nunique() < 2:
+        raise ValueError("Training data must contain wins and losses for fighter_a.")
+    columns, numeric, categorical = _split_features(train_frame)
+    x_train = train_frame[columns]
+    y_train = train_frame["fighter_a_win"].astype(int)
+    estimators = []
+    for name, estimator, scale_numeric in _candidate_estimators(random_state=random_state):
+        pipeline = _pipeline(estimator, numeric, categorical, scale_numeric=scale_numeric)
+        cv = min(3, int(y_train.value_counts().min()))
+        fitted = calibrate_estimator(pipeline, x_train, y_train, method=calibration_method, cv=max(cv, 2)) if cv >= 2 else pipeline.fit(x_train, y_train)
+        fitted.model_name = name  # type: ignore[attr-defined]
+        estimators.append(fitted)
+    bundle = TrainedModelBundle(
+        model_version=f"ufc_predictor_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}",
+        estimators=estimators,
+        feature_columns=columns,
+        numeric_features=numeric,
+        categorical_features=categorical,
+    )
+    metrics: dict[str, Any] = {"baselines": baseline_metrics(dataset)}
+    if not test_frame.empty and test_frame["fighter_a_win"].nunique() >= 1:
+        probabilities = bundle.predict_proba(test_frame[columns])[:, 1]
+        metrics.update(evaluate_predictions(test_frame["fighter_a_win"], probabilities, metadata=test_frame))
+    bundle.metrics = metrics
+    if save:
+        save_model_bundle(bundle, model_dir=model_dir)
+    return bundle
+
+
+def save_model_bundle(bundle: TrainedModelBundle, model_dir: str | Path | None = None) -> Path:
+    output_dir = Path(model_dir) if model_dir else settings.model_dir
+    output_dir.mkdir(parents=True, exist_ok=True)
+    path = output_dir / "ufc_predictor_model.pkl"
+    with path.open("wb") as handle:
+        pickle.dump(bundle, handle)
+    metadata = {
+        "model_version": bundle.model_version,
+        "created_at": bundle.created_at,
+        "feature_columns": bundle.feature_columns,
+        "numeric_features": bundle.numeric_features,
+        "categorical_features": bundle.categorical_features,
+        "metrics": bundle.metrics,
+    }
+    (output_dir / "model_metadata.json").write_text(json.dumps(metadata, indent=2, default=str), encoding="utf-8")
+    return path
+
+
+def load_model_bundle(path: str | Path | None = None) -> TrainedModelBundle:
+    model_path = Path(path) if path else settings.model_dir / "ufc_predictor_model.pkl"
+    with model_path.open("rb") as handle:
+        return pickle.load(handle)
