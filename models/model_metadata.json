@@ -1,6 +1,6 @@
 {
-  "model_version": "ufc_predictor_20260610205229",
-  "created_at": "2026-06-10T20:52:29.282168",
+  "model_version": "ufc_predictor_20260610211950",
+  "created_at": "2026-06-10T21:19:50.975687",
   "feature_columns": [
     "weight_class",
     "scheduled_rounds",
@@ -480,7 +480,7 @@
     },
     "accuracy": 0.5,
     "log_loss": 0.7566175312089106,
-    "brier_score": 0.28030982778497976,
+    "brier_score": 0.2803098277849797,
     "expected_calibration_error": 0.33438532235744667,
     "calibration_curve": [
       {
@@ -544,7 +544,7 @@
         "left": 0.7000000000000001,
         "right": 0.8,
         "count": 1,
-        "mean_predicted_probability": 0.7442300461205114,
+        "mean_predicted_probability": 0.7442300461205115,
         "observed_win_rate": 1.0
       },
       {

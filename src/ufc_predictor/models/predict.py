@@ -15,6 +15,7 @@ from ufc_predictor.models.explain import top_reasons_from_features
 
 
 WARNING_TEXT = "Prediction is not guaranteed. Confidence is based on calibrated historical performance."
+NEUTRAL_FALLBACK_REASON = "No historical data available; using neutral fallback."
 
 
 def confidence_tier(
@@ -62,6 +63,18 @@ def format_prediction_output(
     }
 
 
+def neutral_prediction_output(
+    fighter_a: str,
+    fighter_b: str,
+    reason: str = NEUTRAL_FALLBACK_REASON,
+) -> dict[str, Any]:
+    output = format_prediction_output(fighter_a, fighter_b, 0.5, [reason])
+    output["predicted_winner"] = "Unknown / Toss-up"
+    output["confidence_score"] = 0.5
+    output["confidence_tier"] = "Low"
+    return output
+
+
 def _normal(value: Any) -> str:
     if value is None or (isinstance(value, float) and np.isnan(value)):
         return ""
@@ -75,6 +88,10 @@ def _numeric(value: Any, default: float = 0.0) -> float:
         return float(value)
     except (TypeError, ValueError):
         return default
+
+
+def _frame_has_rows(frame: pd.DataFrame | None) -> bool:
+    return frame is not None and not frame.empty
 
 
 def _prefix(prefix: str, snapshot: dict[str, Any]) -> dict[str, Any]:
@@ -167,6 +184,33 @@ def build_prediction_features(
     return pd.DataFrame([row])
 
 
+def _both_fighters_lack_usable_history(row: pd.Series) -> bool:
+    return (
+        _numeric(row.get("fighter_a_total_ufc_fights_before"), 0.0) <= 0.0
+        and _numeric(row.get("fighter_b_total_ufc_fights_before"), 0.0) <= 0.0
+    )
+
+
+def _needs_neutral_fallback(
+    model: Any | str | Path | None,
+    row: pd.Series,
+    fights: pd.DataFrame | None,
+    fight_stats: pd.DataFrame | None,
+    fighters: pd.DataFrame | None,
+    scorecards: pd.DataFrame | None,
+) -> bool:
+    no_model_or_path = model is None
+    no_input_data = not any(
+        [
+            _frame_has_rows(fights),
+            _frame_has_rows(fight_stats),
+            _frame_has_rows(fighters),
+            _frame_has_rows(scorecards),
+        ]
+    )
+    return (no_model_or_path and no_input_data) or _both_fighters_lack_usable_history(row)
+
+
 def predict_fight(
     model: Any | str | Path | None,
     fighter_a: str,
@@ -192,8 +236,11 @@ def predict_fight(
         scorecards=scorecards,
         extra_context=extra_context,
     )
+    if _needs_neutral_fallback(model, row.iloc[0], fights, fight_stats, fighters, scorecards):
+        return neutral_prediction_output(fighter_a, fighter_b)
+
     bundle = model
-    if isinstance(model, (str, Path)) or model is None:
+    if isinstance(model, (str, Path)):
         try:
             from ufc_predictor.models.train import load_model_bundle
 
