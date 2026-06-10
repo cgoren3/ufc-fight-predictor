@@ -1,0 +1,174 @@
+# UFC Fight Predictor
+
+Leakage-safe UFC fight outcome prediction project. It builds pre-fight matchup features, trains calibrated models, backtests them chronologically, and serves predictions through a CLI or Streamlit dashboard.
+
+The project is designed around these sources:
+
+- [UFCStats](https://ufcstats.com/) for event, fight, fighter, and fight-stat pages.
+- [UFC Scorecards](https://www.ufc.com/scorecards) for official judges' scorecards that can be manually downloaded/imported.
+- [MMA Decisions](https://mmadecisions.com/) for optional manually curated decision, judge, fan/media, and disputed-decision data.
+- [SportsDataIO MMA/UFC API](https://sportsdata.io/mma-ufc-api) as an optional paid source for schedules, odds, live data, results, and historical feeds.
+
+## Install
+
+```bash
+cd ufc-fight-predictor
+pip install -e ".[dev]"
+```
+
+Python 3.11+ is required.
+
+## Data Layout
+
+```text
+data/
+  raw/          # UFCStats CSV output and cache
+  processed/    # feature datasets and backtest outputs
+  external/     # manual scorecards, odds, injuries, camp notes
+models/         # trained model bundle and metadata
+```
+
+## Ingest Data
+
+Default ingestion is intentionally conservative and resumable.
+
+```bash
+ufc-predict ingest-ufcstats
+```
+
+For a small smoke test:
+
+```bash
+ufc-predict ingest-ufcstats --max-events 3
+```
+
+To also parse fight-detail pages and fighter profiles:
+
+```bash
+ufc-predict ingest-ufcstats --include-details
+```
+
+The scraper uses a user-agent header, local HTML cache, request retries, a configurable delay, and a resume file. It should not be used aggressively.
+
+## Manual Data
+
+Official scorecards can be imported from CSV with these columns:
+
+```text
+event,fight_date,fighter_a,fighter_b,judge,
+round_1_a,round_1_b,round_2_a,round_2_b,round_3_a,round_3_b,
+round_4_a,round_4_b,round_5_a,round_5_b,total_a,total_b,decision_type
+```
+
+```bash
+ufc-predict load-scorecards data/external/scorecards.csv
+```
+
+Optional manual files can be placed in `data/external/` for injuries, short-notice flags, missed weight, camp changes, altitude, betting odds, media/fan disputed decisions, or MMA Decisions exports. Join them into `fights.csv` or the processed dataset using stable keys such as `event`, `fight_date`, `fighter_a`, and `fighter_b`.
+
+SportsDataIO is optional. Add a key to `.env` when available:
+
+```text
+SPORTS_DATA_IO_API_KEY=...
+```
+
+The project runs without the key.
+
+## Build Features
+
+```bash
+ufc-predict build-dataset
+```
+
+Every training row is a fighter matchup as of the fight date. For historical rows, features are computed only from fights with `fight_date` strictly before the target fight. Same-day, future, final-career, closing-result, and post-fight information are not used.
+
+Feature groups include biographical data, career experience, recent form, striking, grappling, style matchup interactions, durability, finishing, scorecard/judging features, contextual flags, Elo, and recency-weighted trendlines.
+
+## Train
+
+```bash
+ufc-predict train
+```
+
+The trainer uses a chronological split, not a random split. It trains:
+
+- logistic regression baseline
+- random forest
+- XGBoost when installed, otherwise scikit-learn `HistGradientBoostingClassifier`
+- calibrated ensemble average
+
+Models, feature lists, preprocessing, and metadata are saved in `models/`.
+
+## Backtest
+
+```bash
+ufc-predict backtest
+```
+
+Rolling backtest trains on all fights before each period, predicts the next period, and rolls forward. Metrics include accuracy, log loss, Brier score, ROC AUC, calibration curve data, expected calibration error, performance by confidence tier, year, weight class, main event, men/women when supplied, underdog performance when odds are supplied, and baselines such as better record, higher Elo, and betting favorite when available.
+
+## Predict
+
+```bash
+ufc-predict predict --fighter-a "Islam Makhachev" --fighter-b "Charles Oliveira" --date 2026-10-01 --weight-class "Lightweight" --scheduled-rounds 5
+```
+
+Example output:
+
+```json
+{
+  "fighter_a": "Fighter A",
+  "fighter_b": "Fighter B",
+  "predicted_winner": "Fighter A",
+  "fighter_a_win_probability": 0.63,
+  "fighter_b_win_probability": 0.37,
+  "confidence_score": 0.63,
+  "confidence_tier": "Medium",
+  "top_factors_for_prediction": [
+    "Fighter A has +7.4 Elo advantage",
+    "Fighter A has stronger striking differential"
+  ],
+  "warning": "Prediction is not guaranteed. Confidence is based on calibrated historical performance."
+}
+```
+
+Confidence uses calibrated probability:
+
+- Low: 50% to 57%
+- Medium: 57% to 65%
+- High: 65%+
+
+Thresholds can be changed in `src/ufc_predictor/config.py` or `.env`.
+
+## Streamlit
+
+```bash
+streamlit run src/ufc_predictor/app/streamlit_app.py
+```
+
+The dashboard lets you select fighters, fight date, weight class, and scheduled rounds, then shows predicted winner, probability bars, confidence tier, top features, fighter comparison, recent form, and backtest performance.
+
+## Leakage Policy
+
+The most important rule: a row for a fight may only use information available before that fight date.
+
+This means:
+
+- No future fights in rolling stats.
+- No final career totals.
+- No post-fight stats from the fight being predicted.
+- No closing result fields in pre-fight features.
+- Betting odds are optional and should be timestamped; use only odds available before prediction time.
+- Manual notes must be dated or deliberately scoped to pre-fight knowledge.
+
+## Tests
+
+```bash
+pytest
+```
+
+Tests verify no future fight leakage, Elo update timing, safe fighter-order handling, probability normalization, confidence tiers, and missing-data prediction behavior.
+
+## Accuracy
+
+Predictions are probabilistic, not guarantees. MMA outcomes are noisy, datasets can be incomplete, and late-breaking information such as injuries, weight misses, opponent changes, and judging variance can materially affect results. Treat the output as a calibrated research signal, not betting advice.
