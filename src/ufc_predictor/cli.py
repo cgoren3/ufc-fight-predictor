@@ -225,6 +225,49 @@ def import_csv(
         _print(f"- {name}: {path}")
 
 
+@app.command("import-enrichment")
+def import_enrichment(
+    enrichment_path: Path = typer.Option(
+        settings.raw_data_dir / "imports" / "fight_enrichment.csv",
+        help="Fight-level enrichment CSV path.",
+    ),
+    fights_path: Path = typer.Option(
+        settings.raw_data_dir / "imports" / "fights.csv",
+        help="Import-schema fights.csv to enrich.",
+    ),
+    output_path: Optional[Path] = typer.Option(
+        None,
+        help="Where enriched fights.csv should be written. Defaults to overwriting --fights-path after validation.",
+    ),
+) -> None:
+    from ufc_predictor.enrichment import import_enrichment_csv
+
+    destination = output_path or fights_path
+    try:
+        report = import_enrichment_csv(
+            enrichment_path=enrichment_path,
+            fights_path=fights_path,
+            output_path=destination,
+        )
+    except InputDataError as exc:
+        note = ""
+        if fights_path.exists():
+            note = f"\nExisting fights.csv was not modified: {fights_path}"
+        _runtime_error(f"Fight enrichment import failed:\n{exc}{note}")
+
+    _print(f"Applied fight enrichment from {enrichment_path}")
+    _print(f"Fights rows: {report.fights_rows}")
+    _print(f"Enrichment rows: {report.enrichment_rows}")
+    _print(f"Matched enrichment rows: {report.matched_rows}")
+    _print(f"Unmatched enrichment rows: {report.unmatched_enrichment_rows}")
+    _print(f"Wrote enriched fights CSV to {report.output_path}")
+    _print("Updated fields:")
+    for field, count in report.updated_fields.items():
+        _print(f"- {field}: {count}")
+    for warning in report.warnings:
+        _print(f"[yellow]Warning: {warning}[/yellow]")
+
+
 @app.command("import-odds")
 def import_odds(
     import_path: Path = typer.Option(settings.raw_data_dir / "imports" / "odds.csv", help="Raw odds CSV import path."),
@@ -537,6 +580,14 @@ def report(
     _print("Performance report")
     _print(f"Dataset fights: {dataset.get('fights', 0)}")
     _print(f"Dataset date range: {dataset.get('date_range', {}).get('start')} to {dataset.get('date_range', {}).get('end')}")
+    coverage = payload.get("data_quality_coverage", {})
+    if coverage:
+        _print("Data quality coverage:")
+        _print(f"- known weight_class: {coverage.get('known_weight_class_pct', 0.0):.1f}%")
+        _print(f"- known event_location: {coverage.get('known_event_location_pct', 0.0):.1f}%")
+        _print(f"- known main_event: {coverage.get('known_main_event_pct', 0.0):.1f}%")
+        _print(f"- odds coverage: {coverage.get('odds_coverage_pct', 0.0):.1f}%")
+        _print(f"- scorecard coverage: {coverage.get('scorecard_coverage_pct', 0.0):.1f}%")
     _print(f"Train accuracy: {train_metrics.get('accuracy')}")
     _print(f"Backtest accuracy: {backtest_metrics.get('accuracy')}")
     _print(f"Backtest calibration error: {backtest_metrics.get('expected_calibration_error')}")

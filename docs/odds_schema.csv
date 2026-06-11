@@ -1,0 +1,8 @@
+column,required,type,description
+fight_date,required,date,Date of the fight in YYYY-MM-DD or parseable date format.
+fighter_a,required,string,First fighter name matching fights.csv.
+fighter_b,required,string,Second fighter name matching fights.csv.
+sportsbook,required,string,Book/source name for provenance.
+fighter_a_odds,required,integer,American odds for fighter_a available before the prediction time.
+fighter_b_odds,required,integer,American odds for fighter_b available before the prediction time.
+timestamp,required,datetime,Timestamp when this odds snapshot was observed.

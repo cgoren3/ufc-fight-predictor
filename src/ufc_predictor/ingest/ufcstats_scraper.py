@@ -588,7 +588,8 @@ def import_raw_csvs(
             for column in FIGHT_COLUMNS:
                 if column not in frame.columns:
                     frame[column] = ""
-            frame = frame[FIGHT_COLUMNS]
+            extra_columns = [column for column in frame.columns if column not in FIGHT_COLUMNS]
+            frame = frame[[*FIGHT_COLUMNS, *extra_columns]]
         elif columns is None:
             frame = frame.copy()
         elif name == "fight_stats":

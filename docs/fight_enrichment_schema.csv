@@ -1,0 +1,10 @@
+column,required,type,description
+fight_date,required,date,Date the fight occurred in YYYY-MM-DD or parseable date format.
+event,required,string,Event name matching fights.csv event_name.
+fighter_a,required,string,One fighter in the bout; order can be either orientation.
+fighter_b,required,string,The other fighter in the bout; order can be either orientation.
+weight_class,recommended,string,UFC weight class such as Lightweight or Women's Strawweight.
+event_location,recommended,string,Event location text such as Las Vegas Nevada USA.
+main_event,recommended,integer,1 if this fight was the main event else 0.
+title_fight,optional,integer,1 if this fight was a title fight else 0.
+scheduled_rounds,recommended,integer,3 or 5 where known.

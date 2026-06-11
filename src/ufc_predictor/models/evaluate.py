@@ -13,6 +13,19 @@ from ufc_predictor.models.calibrate import calibration_curve_data, expected_cali
 from ufc_predictor.models.predict import confidence_tier
 
 
+BACKTEST_METADATA_COLUMNS = [
+    "weight_class",
+    "main_event",
+    "title_fight",
+    "scheduled_rounds",
+    "event_location",
+    "sex",
+    "market_fighter_a_implied_probability",
+    "market_fighter_b_implied_probability",
+    "closing_odds_favorite_is_a",
+]
+
+
 def _clip_probs(y_prob: np.ndarray) -> np.ndarray:
     return np.clip(np.asarray(y_prob, dtype=float), 1e-6, 1.0 - 1e-6)
 
@@ -195,7 +208,11 @@ def rolling_backtest(
         bundle = train_ensemble(train, model_dir=model_dir, save=False, test_fraction=0.0)
         probs = bundle.predict_proba(test[bundle.feature_columns])[:, 1]
         for (_, item), prob in zip(test.iterrows(), probs):
-            rows.append({"fight_id": item.get("fight_id"), "fight_date": item["fight_date"], "target": item["fighter_a_win"], "prob": prob})
+            row = {"fight_id": item.get("fight_id"), "fight_date": item["fight_date"], "target": item["fighter_a_win"], "prob": prob}
+            for column in BACKTEST_METADATA_COLUMNS:
+                if column in item.index:
+                    row[column] = item.get(column)
+            rows.append(row)
         if progress_callback is not None:
             progress_callback(
                 {

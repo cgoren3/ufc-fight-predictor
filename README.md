@@ -167,6 +167,20 @@ round_1_a,round_1_b,round_2_a,round_2_b,round_3_a,round_3_b,
 round_4_a,round_4_b,round_5_a,round_5_b,total_a,total_b,decision_type
 ```
 
+Optional enrichment: `data/raw/imports/fight_enrichment.csv`
+
+```text
+fight_date,event,fighter_a,fighter_b,weight_class,event_location,main_event,title_fight,scheduled_rounds
+```
+
+Use this when a Kaggle or third-party dataset has fight outcomes and stats but lacks reliable weight class, event location, main-event status, title-fight status, or scheduled rounds. The join uses fight date, event name, and the sorted fighter pair, so fighter order can be either orientation. Apply enrichment before importing normalized raw data:
+
+```bash
+ufc-predict import-enrichment
+ufc-predict validate-imports
+ufc-predict import-csv
+```
+
 `build-dataset` automatically imports `data/raw/imports/fights.csv` when present. It refuses to build from bundled sample data unless `--use-sample-data` is passed, and it warns when fewer than 500 training rows are produced.
 
 Full schema files live in:
@@ -175,6 +189,8 @@ Full schema files live in:
 - `docs/fighters_schema.csv`
 - `docs/fight_stats_schema.csv`
 - `docs/scorecards_schema.csv`
+- `docs/fight_enrichment_schema.csv`
+- `docs/odds_schema.csv`
 
 Additional import guidance lives in `docs/import_data.md`.
 
@@ -199,6 +215,14 @@ The adapter writes real import files under `data/raw/imports/`; it does not trea
 
 The adapter also supports long-format fighter-performance CSVs with columns such as `fight_fighter`, `opponent`, `fight_result`, `kd`, `str`, `td`, `sub`, `event`, `event_date`, `method`, `round`, and `time`.
 
+If the adapted file leaves `weight_class` as `Unknown`, `event_location` blank, or `main_event` as all zeroes, create `data/raw/imports/fight_enrichment.csv` and run:
+
+```bash
+ufc-predict import-enrichment
+ufc-predict validate-imports
+ufc-predict import-csv
+```
+
 ## Manual Data
 
 Official scorecards can be imported from CSV with these columns:
@@ -213,7 +237,7 @@ round_4_a,round_4_b,round_5_a,round_5_b,total_a,total_b,decision_type
 ufc-predict load-scorecards data/external/scorecards.csv
 ```
 
-Optional manual files can be placed in `data/external/` for injuries, short-notice flags, missed weight, camp changes, altitude, betting odds, media/fan disputed decisions, or MMA Decisions exports. Join them into `fights.csv` or the processed dataset using stable keys such as `event`, `fight_date`, `fighter_a`, and `fighter_b`.
+Optional manual files can be placed in `data/external/` or normalized under `data/raw/imports/` for injuries, short-notice flags, missed weight, camp changes, altitude, betting odds, media/fan disputed decisions, or MMA Decisions exports. Fight-level context belongs in `data/raw/imports/fight_enrichment.csv` and can be applied with `ufc-predict import-enrichment`.
 
 SportsDataIO is optional. Add a key to `.env` when available:
 
@@ -278,6 +302,13 @@ Optional odds imports use `data/raw/imports/odds.csv`:
 fight_date,fighter_a,fighter_b,sportsbook,fighter_a_odds,fighter_b_odds,timestamp
 ```
 
+Example:
+
+```csv
+fight_date,fighter_a,fighter_b,sportsbook,fighter_a_odds,fighter_b_odds,timestamp
+2020-01-18,Conor McGregor,Donald Cerrone,ExampleBook,-300,240,2020-01-17T12:00:00Z
+```
+
 ```bash
 ufc-predict import-odds
 ```
@@ -289,6 +320,8 @@ Training saves `models/model_card.json`, and reports can be generated with:
 ```bash
 ufc-predict report
 ```
+
+The report includes data-quality coverage percentages for known `weight_class`, known `event_location`, known `main_event`, matched odds, and matched scorecards.
 
 ## Predict
 

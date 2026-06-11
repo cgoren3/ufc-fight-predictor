@@ -10,6 +10,8 @@ fight_fighter,opponent,fight_result,kd,str,td,sub,event,event_date,method,round,
 
 For that layout, mirrored rows are deduplicated into one `fights.csv` row per actual fight, while `fight_stats.csv` keeps one row per fighter performance.
 
+Some long-format exports do not include `weight_class`, `event_location`, or `main_event`. The adapter leaves those values as `Unknown`, blank, or `0` instead of guessing. Add those fields later with `data/raw/imports/fight_enrichment.csv`.
+
 Rows with missing or unparseable `event_date` are skipped with a warning because this project cannot build leakage-safe chronological features from undated fights.
 
 ## 1. Download Manually
@@ -68,6 +70,26 @@ ufc-predict data-summary
 ```
 
 Validation checks required files, required columns, parseable fight dates, winner names, fighter name consistency, two stats rows per fight when possible, and dataset size.
+
+If you have fight context metadata, create:
+
+```text
+data/raw/imports/fight_enrichment.csv
+```
+
+with:
+
+```text
+fight_date,event,fighter_a,fighter_b,weight_class,event_location,main_event,title_fight,scheduled_rounds
+```
+
+Then run:
+
+```bash
+ufc-predict import-enrichment
+ufc-predict validate-imports
+ufc-predict import-csv
+```
 
 ## 5. Build and Model
 

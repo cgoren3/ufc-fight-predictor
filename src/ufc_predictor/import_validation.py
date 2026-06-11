@@ -7,6 +7,13 @@ from typing import Any
 import pandas as pd
 
 from ufc_predictor.data_io import InputDataError, inspect_csv
+from ufc_predictor.enrichment import (
+    ENRICHMENT_COLUMNS,
+    EnrichmentError,
+    fight_identity_key,
+    is_unknown_weight_class,
+    validate_enrichment_frame,
+)
 from ufc_predictor.ingest.scorecards_loader import REQUIRED_COLUMNS as SCORECARD_COLUMNS
 from ufc_predictor.ingest.ufcstats_scraper import FIGHT_STAT_COLUMNS, FIGHTER_COLUMNS, FIGHT_COLUMNS
 
@@ -64,6 +71,94 @@ def _names_from_fights(fights: pd.DataFrame) -> set[str]:
     return names
 
 
+def _numeric_location_values(series: pd.Series) -> list[str]:
+    values = series.dropna().astype(str).str.strip()
+    values = values.loc[values != ""]
+    return values.loc[values.str.fullmatch(r"[-+]?\d+(\.\d+)?", na=False)].head(5).tolist()
+
+
+def _validate_fight_context_fields(fights: pd.DataFrame, result: ImportValidationResult) -> None:
+    if "main_event" in fights.columns:
+        values = fights["main_event"].dropna().astype(str).str.strip()
+        values = values.loc[values != ""]
+        if not values.empty:
+            numeric = pd.to_numeric(values, errors="coerce")
+            invalid = values.loc[numeric.isna() | ~numeric.isin([0, 1])]
+            if not invalid.empty:
+                result.errors.append(f"main_event must contain only 0 or 1 values. Invalid sample: {invalid.head(5).tolist()}")
+    if "title_fight" in fights.columns:
+        values = fights["title_fight"].dropna().astype(str).str.strip()
+        values = values.loc[values != ""]
+        if not values.empty:
+            numeric = pd.to_numeric(values, errors="coerce")
+            invalid = values.loc[numeric.isna() | ~numeric.isin([0, 1])]
+            if not invalid.empty:
+                result.errors.append(f"title_fight must contain only 0 or 1 values. Invalid sample: {invalid.head(5).tolist()}")
+    if "scheduled_rounds" in fights.columns:
+        values = fights["scheduled_rounds"].dropna().astype(str).str.strip()
+        values = values.loc[values != ""]
+        if not values.empty:
+            numeric = pd.to_numeric(values, errors="coerce")
+            invalid = values.loc[numeric.isna() | ~numeric.isin([3, 5])]
+            if not invalid.empty:
+                result.errors.append(
+                    f"scheduled_rounds must be 3 or 5 where known. Invalid sample: {invalid.head(5).tolist()}"
+                )
+    if "event_location" in fights.columns:
+        numeric_locations = _numeric_location_values(fights["event_location"])
+        if numeric_locations:
+            result.errors.append(
+                "event_location must be categorical location text, not numeric values. "
+                f"Invalid sample: {numeric_locations}"
+            )
+
+
+def _validate_enrichment_applied(import_dir: Path, fights: pd.DataFrame, result: ImportValidationResult) -> None:
+    enrichment_path = import_dir / "fight_enrichment.csv"
+    if not enrichment_path.exists():
+        return
+    enrichment = _read_csv_if_valid(enrichment_path, ENRICHMENT_COLUMNS, "fight_enrichment.csv", result)
+    if enrichment is None:
+        return
+    try:
+        for warning in validate_enrichment_frame(enrichment):
+            result.warnings.append(warning)
+    except EnrichmentError as exc:
+        result.errors.append(str(exc))
+        return
+
+    event_column = "event_name" if "event_name" in fights.columns else "event"
+    fights_by_key = {fight_identity_key(row, event_column=event_column): row for _, row in fights.iterrows()}
+    stale_rows = []
+    for _, row in enrichment.iterrows():
+        if is_unknown_weight_class(row.get("weight_class")):
+            continue
+        key = fight_identity_key(
+            {
+                "fight_date": row.get("fight_date"),
+                "event": row.get("event"),
+                "fighter_a": row.get("fighter_a"),
+                "fighter_b": row.get("fighter_b"),
+            },
+            event_column="event",
+        )
+        fight_row = fights_by_key.get(key)
+        if fight_row is not None and is_unknown_weight_class(fight_row.get("weight_class")):
+            stale_rows.append(
+                {
+                    "fight_date": row.get("fight_date"),
+                    "event": row.get("event"),
+                    "fighter_a": row.get("fighter_a"),
+                    "fighter_b": row.get("fighter_b"),
+                }
+            )
+    if stale_rows:
+        result.errors.append(
+            "fight_enrichment.csv provides weight_class values that have not been applied to fights.csv. "
+            f"Run `ufc-predict import-enrichment`. Sample rows: {stale_rows[:3]}"
+        )
+
+
 def validate_import_directory(import_dir: str | Path) -> ImportValidationResult:
     path = Path(import_dir)
     result = ImportValidationResult(import_dir=path)
@@ -108,6 +203,8 @@ def validate_import_directory(import_dir: str | Path) -> ImportValidationResult:
             result.warnings.append("Too small for meaningful model training")
         if len(fights) < MIN_RELIABLE_BACKTEST_FIGHTS:
             result.warnings.append("Backtest reliability will be limited")
+        _validate_fight_context_fields(fights, result)
+        _validate_enrichment_applied(path, fights, result)
 
     fight_names = _names_from_fights(fights) if fights is not None else set()
     if fighters is not None:
