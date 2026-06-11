@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+.pytest_cache/
+*.egg-info/
+
+# Local environments
+.env
+.venv/
+venv/
+
+# Generated model artifacts
+models/*.pkl
+models/model_metadata.json
+
+# Generated processed datasets and backtests
+data/processed/
+*.parquet
+*backtest*.json
+
+# Generated raw-data metadata
+data/raw/source_metadata.json

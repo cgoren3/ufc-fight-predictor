@@ -43,6 +43,14 @@ data/
 models/         # trained model bundle and metadata
 ```
 
+Generated models, processed datasets, and backtest files are local artifacts and are ignored by Git. Regenerate them when needed:
+
+```bash
+ufc-predict build-dataset
+ufc-predict train
+ufc-predict backtest
+```
+
 ## Ingest Data
 
 Default ingestion is intentionally conservative and resumable.
