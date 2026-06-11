@@ -85,6 +85,17 @@ def _print_fetch_diagnostics(diagnostics) -> None:
     _print(diagnostics.format())
 
 
+def _format_seconds(seconds: float) -> str:
+    seconds = max(float(seconds), 0.0)
+    minutes, whole_seconds = divmod(int(seconds), 60)
+    hours, minutes = divmod(minutes, 60)
+    if hours:
+        return f"{hours}h {minutes}m {whole_seconds}s"
+    if minutes:
+        return f"{minutes}m {whole_seconds}s"
+    return f"{whole_seconds}s"
+
+
 def _read_dataset(path: Path) -> pd.DataFrame:
     if path.suffix == ".parquet":
         try:
@@ -314,11 +325,15 @@ def build_dataset(
     randomize_order: bool = typer.Option(False, help="Randomize fighter order once per fight."),
     use_sample_data: bool = typer.Option(False, help="Build from the bundled sample/dev dataset."),
     imports_dir: Path = typer.Option(settings.raw_data_dir / "imports", help="Prefer real CSV imports from this directory when present."),
+    limit: Optional[int] = typer.Option(None, help="Only process the first N chronological fights for smoke tests."),
+    verbose: bool = typer.Option(False, "--verbose", help="Print additional build diagnostics."),
 ) -> None:
-    from ufc_predictor.features.build_fight_dataset import build_fight_dataset, save_dataset
+    from ufc_predictor.features.build_fight_dataset import BuildDatasetError, build_fight_dataset, save_dataset
     from ufc_predictor.ingest.ufcstats_scraper import UFCStatsScraperError, import_raw_csvs
     from ufc_predictor.sample_data import load_sample_data, write_sample_data
 
+    if limit is not None and limit <= 0:
+        _runtime_error("--limit must be greater than 0.")
     raw_output_dir = fights_csv.parent
     if use_sample_data:
         fights, fighters, fight_stats, scorecards = load_sample_data()
@@ -349,16 +364,75 @@ def build_dataset(
         fight_stats = read_optional_csv(fight_stats_csv, label="fight stats CSV")
         fighters = read_optional_csv(fighters_csv, label="fighters CSV")
         scorecards = read_optional_csv(scorecards_csv, label="scorecards CSV")
-    dataset = build_fight_dataset(
-        fights=fights,
-        fight_stats=fight_stats,
-        fighters=fighters,
-        scorecards=scorecards,
-        two_way=two_way,
-        randomize_order=randomize_order,
-    )
-    path = save_dataset(dataset, output)
-    _print(f"Wrote {len(dataset)} training rows to {path}")
+
+    if verbose:
+        _print(
+            "Input rows: "
+            f"fights={len(fights)}, "
+            f"fighters={0 if fighters is None else len(fighters)}, "
+            f"fight_stats={0 if fight_stats is None else len(fight_stats)}, "
+            f"scorecards={0 if scorecards is None else len(scorecards)}"
+        )
+        if limit is not None:
+            _print(f"Limit: processing first {limit} chronological fights.")
+
+    def print_progress(progress) -> None:
+        _print(
+            "Progress: "
+            f"{progress.processed_fights}/{progress.total_fights} fights processed | "
+            f"elapsed {_format_seconds(progress.elapsed_seconds)} | "
+            f"ETA {_format_seconds(progress.estimated_remaining_seconds)}"
+        )
+
+    try:
+        dataset = build_fight_dataset(
+            fights=fights,
+            fight_stats=fight_stats,
+            fighters=fighters,
+            scorecards=scorecards,
+            two_way=two_way,
+            randomize_order=randomize_order,
+            limit=limit,
+            progress_callback=print_progress,
+        )
+        path = save_dataset(dataset, output)
+    except BuildDatasetError as exc:
+        cause = exc.__cause__ or exc
+        lines = [
+            "Dataset build failed.",
+            f"Exception type: {type(cause).__name__}",
+            f"Message: {cause}",
+        ]
+        if exc.current_fight:
+            lines.append(f"Current fight: {exc.current_fight}")
+        _runtime_error("\n".join(lines))
+    except Exception as exc:
+        _runtime_error(
+            "\n".join(
+                [
+                    "Dataset build failed.",
+                    f"Exception type: {type(exc).__name__}",
+                    f"Message: {exc}",
+                ]
+            )
+        )
+
+    report = dataset.attrs.get("build_report")
+    _print("Dataset build complete.")
+    if report is not None:
+        _print(f"Total fights read: {report.total_fights_read}")
+        _print(f"Total fights processed: {report.total_fights_processed}")
+        _print(f"Total training rows written: {len(dataset)}")
+        _print(f"Output path: {path}")
+        _print(f"Skipped rows count: {report.skipped_rows_count}")
+        if report.skipped_reasons:
+            _print("Skipped row reasons:")
+            for reason, count in sorted(report.skipped_reasons.items()):
+                _print(f"- {reason}: {count}")
+        else:
+            _print("Skipped row reasons: none")
+    else:
+        _print(f"Wrote {len(dataset)} training rows to {path}")
     if len(dataset) < TINY_DATASET_WARNING_THRESHOLD:
         _print(
             f"[yellow]Warning: only {len(dataset)} training rows were built. "

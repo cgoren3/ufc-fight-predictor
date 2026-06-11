@@ -222,7 +222,7 @@ def test_build_dataset_uses_imported_data_and_warns_on_tiny_dataset(tmp_path) ->
     assert result.exit_code == 0
     assert "Using real CSV imports" in result.output
     assert "Using csv import data for dataset build" in result.output
-    assert "Wrote 8 training rows" in result.output
+    assert "Total training rows written: 8" in result.output
     assert "Warning: only 8 training rows" in result.output
     assert pd.read_csv(raw_dir / "fights.csv").loc[0, "event_name"] == "Offline Import FC 1"
 

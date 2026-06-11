@@ -1,14 +1,16 @@
 from __future__ import annotations
 
+import time
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 import pandas as pd
 
 from ufc_predictor.config import settings
 from ufc_predictor.features.elo import build_elo_features
-from ufc_predictor.features.fighter_history import SNAPSHOT_NUMERIC_DEFAULTS, compute_fighter_snapshot
+from ufc_predictor.features.fighter_history import FighterHistoryContext, SNAPSHOT_NUMERIC_DEFAULTS, compute_fighter_snapshot
 from ufc_predictor.features.style_features import compute_style_matchup_features
 from ufc_predictor.features.validation import validate_training_frame
 
@@ -26,6 +28,34 @@ METADATA_COLUMNS = {
     "max_history_date_used",
     "source_url",
 }
+
+
+@dataclass(frozen=True)
+class BuildProgress:
+    processed_fights: int
+    total_fights: int
+    elapsed_seconds: float
+    estimated_remaining_seconds: float
+
+
+@dataclass
+class BuildDatasetReport:
+    total_fights_read: int = 0
+    total_fights_processed: int = 0
+    training_rows_written: int = 0
+    skipped_rows_count: int = 0
+    skipped_reasons: dict[str, int] = field(default_factory=dict)
+
+
+class BuildDatasetError(RuntimeError):
+    """Raised with fight context when feature generation fails mid-build."""
+
+    def __init__(self, message: str, current_fight: dict[str, Any] | None = None):
+        super().__init__(message)
+        self.current_fight = current_fight or {}
+
+
+ProgressCallback = Callable[[BuildProgress], None]
 
 
 def _normal(value: Any) -> str:
@@ -51,14 +81,19 @@ def _prepare_fights(fights: pd.DataFrame) -> pd.DataFrame:
 
 
 def _target(row: pd.Series, fighter_a: str, fighter_b: str) -> int | None:
+    target, _ = _target_with_reason(row, fighter_a, fighter_b)
+    return target
+
+
+def _target_with_reason(row: pd.Series, fighter_a: str, fighter_b: str) -> tuple[int | None, str | None]:
     winner = _normal(row.get("winner"))
     if not winner or winner.lower() in {"draw", "nc", "no contest"}:
-        return None
+        return None, "missing_or_non_decisive_winner"
     if winner == fighter_a:
-        return 1
+        return 1, None
     if winner == fighter_b:
-        return 0
-    return None
+        return 0, None
+    return None, "winner_not_in_fight"
 
 
 def _prefix_snapshot(prefix: str, snapshot: dict[str, Any]) -> dict[str, Any]:
@@ -88,6 +123,7 @@ def _row_for_order(
     fight_stats: pd.DataFrame | None,
     fighters: pd.DataFrame | None,
     scorecards: pd.DataFrame | None,
+    context: FighterHistoryContext | None = None,
 ) -> dict[str, Any] | None:
     target = _target(fight_row, fighter_a, fighter_b)
     if target is None:
@@ -102,6 +138,7 @@ def _row_for_order(
         fighters=fighters,
         scorecards=scorecards,
         weight_class=weight_class,
+        context=context,
     )
     b_snapshot = compute_fighter_snapshot(
         all_fights,
@@ -111,6 +148,7 @@ def _row_for_order(
         fighters=fighters,
         scorecards=scorecards,
         weight_class=weight_class,
+        context=context,
     )
     style = compute_style_matchup_features(a_snapshot, b_snapshot)
     max_dates = [
@@ -144,6 +182,17 @@ def _row_for_order(
     return row
 
 
+def _fight_context(row: pd.Series) -> dict[str, Any]:
+    return {
+        "fight_id": row.get("fight_id"),
+        "event_name": row.get("event_name", ""),
+        "fight_date": str(row.get("fight_date", "")),
+        "fighter_a": row.get("fighter_a", ""),
+        "fighter_b": row.get("fighter_b", ""),
+        "winner": row.get("winner", ""),
+    }
+
+
 def build_fight_dataset(
     fights: pd.DataFrame,
     fight_stats: pd.DataFrame | None = None,
@@ -152,6 +201,9 @@ def build_fight_dataset(
     two_way: bool = False,
     randomize_order: bool = False,
     random_state: int = 42,
+    limit: int | None = None,
+    progress_callback: ProgressCallback | None = None,
+    progress_interval: int = 250,
 ) -> pd.DataFrame:
     """Build one pre-fight matchup row per bout.
 
@@ -160,31 +212,65 @@ def build_fight_dataset(
     changing target semantics.
     """
 
+    total_fights_read = int(len(fights))
     frame = _prepare_fights(fights)
     if frame.empty:
-        return pd.DataFrame()
+        empty = pd.DataFrame()
+        empty.attrs["build_report"] = BuildDatasetReport(total_fights_read=total_fights_read)
+        return empty
+    if limit is not None:
+        frame = frame.head(limit).copy()
+    total_fights = int(len(frame))
+    context = FighterHistoryContext.from_frames(frame, fight_stats=fight_stats, fighters=fighters)
     rng = np.random.default_rng(random_state)
     rows: list[dict[str, Any]] = []
-    for _, fight_row in frame.iterrows():
+    report = BuildDatasetReport(total_fights_read=total_fights_read, total_fights_processed=total_fights)
+    start = time.perf_counter()
+    for processed, (_, fight_row) in enumerate(frame.iterrows(), start=1):
         orders = [(fight_row["fighter_a"], fight_row["fighter_b"])]
         if two_way:
             orders.append((fight_row["fighter_b"], fight_row["fighter_a"]))
         elif randomize_order and bool(rng.integers(0, 2)):
             orders = [(fight_row["fighter_b"], fight_row["fighter_a"])]
         for fighter_a, fighter_b in orders:
-            dataset_row = _row_for_order(
-                fight_row=fight_row,
-                fighter_a=fighter_a,
-                fighter_b=fighter_b,
-                all_fights=frame,
-                fight_stats=fight_stats,
-                fighters=fighters,
-                scorecards=scorecards,
-            )
-            if dataset_row is not None:
+            _, skip_reason = _target_with_reason(fight_row, fighter_a, fighter_b)
+            if skip_reason is not None:
+                report.skipped_rows_count += 1
+                report.skipped_reasons[skip_reason] = report.skipped_reasons.get(skip_reason, 0) + 1
+                continue
+            try:
+                dataset_row = _row_for_order(
+                    fight_row=fight_row,
+                    fighter_a=fighter_a,
+                    fighter_b=fighter_b,
+                    all_fights=frame,
+                    fight_stats=fight_stats,
+                    fighters=fighters,
+                    scorecards=scorecards,
+                    context=context,
+                )
+            except Exception as exc:
+                raise BuildDatasetError("Feature generation failed while processing a fight.", _fight_context(fight_row)) from exc
+            if dataset_row is None:
+                report.skipped_rows_count += 1
+                report.skipped_reasons["unknown_target_skip"] = report.skipped_reasons.get("unknown_target_skip", 0) + 1
+            else:
                 rows.append(dataset_row)
+        if progress_callback is not None and (processed % progress_interval == 0 or processed == total_fights):
+            elapsed = time.perf_counter() - start
+            rate = processed / elapsed if elapsed > 0 else 0.0
+            remaining = (total_fights - processed) / rate if rate > 0 else 0.0
+            progress_callback(
+                BuildProgress(
+                    processed_fights=processed,
+                    total_fights=total_fights,
+                    elapsed_seconds=elapsed,
+                    estimated_remaining_seconds=remaining,
+                )
+            )
     dataset = pd.DataFrame(rows)
     if dataset.empty:
+        dataset.attrs["build_report"] = report
         return dataset
 
     elo = build_elo_features(frame)
@@ -244,7 +330,10 @@ def build_fight_dataset(
     for column in sorted(numeric_columns & set(dataset.columns)):
         dataset[column] = pd.to_numeric(dataset[column], errors="coerce")
     validate_training_frame(dataset)
-    return dataset.sort_values(["fight_date", "fight_id", "fighter_a"]).reset_index(drop=True)
+    dataset = dataset.sort_values(["fight_date", "fight_id", "fighter_a"]).reset_index(drop=True)
+    report.training_rows_written = int(len(dataset))
+    dataset.attrs["build_report"] = report
+    return dataset
 
 
 def feature_columns(frame: pd.DataFrame) -> list[str]:
@@ -260,9 +349,11 @@ def feature_columns(frame: pd.DataFrame) -> list[str]:
 def save_dataset(frame: pd.DataFrame, path: str | Path | None = None) -> Path:
     output = Path(path) if path else settings.processed_data_dir / "fight_dataset.parquet"
     output.parent.mkdir(parents=True, exist_ok=True)
+    frame_to_write = frame.copy()
+    frame_to_write.attrs = {}
     try:
-        frame.to_parquet(output, index=False)
+        frame_to_write.to_parquet(output, index=False)
     except Exception:
         output = output.with_suffix(".csv")
-        frame.to_csv(output, index=False)
+        frame_to_write.to_csv(output, index=False)
     return output

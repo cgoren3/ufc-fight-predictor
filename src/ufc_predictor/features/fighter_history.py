@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
@@ -150,6 +151,128 @@ def fighter_fight_history(fights: pd.DataFrame, fighter: str, as_of_date: object
     history = frame.loc[mask].sort_values("fight_date").copy()
     assert_history_is_before(history, as_of_date)
     return history
+
+
+def _name_key(value: Any) -> str:
+    return _normal(value).lower()
+
+
+@dataclass
+class FighterHistoryContext:
+    """Precomputed indexes used during bulk feature builds."""
+
+    history_by_fighter: dict[str, pd.DataFrame] = field(default_factory=dict)
+    fighter_bio_by_name: dict[str, pd.Series] = field(default_factory=dict)
+    stats_by_fighter: dict[str, pd.DataFrame] = field(default_factory=dict)
+    stats_by_fight_id: dict[Any, pd.DataFrame] = field(default_factory=dict)
+
+    @classmethod
+    def from_frames(
+        cls,
+        fights: pd.DataFrame,
+        fight_stats: pd.DataFrame | None = None,
+        fighters: pd.DataFrame | None = None,
+    ) -> "FighterHistoryContext":
+        frame = fights.copy()
+        if not frame.empty:
+            frame["fight_date"] = pd.to_datetime(frame["fight_date"], errors="coerce")
+            sort_columns = ["fight_date"] + (["fight_id"] if "fight_id" in frame.columns else [])
+            frame = frame.sort_values(sort_columns).reset_index(drop=True)
+
+        history_rows: list[pd.DataFrame] = []
+        if not frame.empty:
+            for column in ["fighter_a", "fighter_b"]:
+                if column in frame.columns:
+                    part = frame.copy()
+                    part["_history_fighter_key"] = part[column].map(_name_key)
+                    history_rows.append(part)
+        history_by_fighter: dict[str, pd.DataFrame] = {}
+        if history_rows:
+            long_history = pd.concat(history_rows, ignore_index=True)
+            sort_columns = ["_history_fighter_key", "fight_date"] + (["fight_id"] if "fight_id" in long_history.columns else [])
+            long_history = long_history.sort_values(sort_columns).reset_index(drop=True)
+            for key, group in long_history.groupby("_history_fighter_key", sort=False):
+                history_by_fighter[key] = group.drop(columns=["_history_fighter_key"]).reset_index(drop=True)
+
+        fighter_bio_by_name: dict[str, pd.Series] = {}
+        if fighters is not None and not fighters.empty and "name" in fighters.columns:
+            for _, row in fighters.iterrows():
+                name = _name_key(row.get("name"))
+                if name:
+                    fighter_bio_by_name[name] = row
+
+        stats_by_fighter: dict[str, pd.DataFrame] = {}
+        stats_by_fight_id: dict[Any, pd.DataFrame] = {}
+        if fight_stats is not None and not fight_stats.empty:
+            stats = fight_stats.copy()
+            if "fight_id" in stats.columns and "fight_id" in frame.columns and "fight_date" not in stats.columns:
+                merge_columns = ["fight_id", "fight_date", "fighter_a", "fighter_b"]
+                stats = stats.merge(frame[merge_columns], on="fight_id", how="left")
+            if "fighter" in stats.columns:
+                stats["_fighter_key"] = stats["fighter"].map(_name_key)
+                sort_columns = ["fight_date"] if "fight_date" in stats.columns else []
+                if "fight_id" in stats.columns:
+                    sort_columns.append("fight_id")
+                if sort_columns:
+                    stats = stats.sort_values(sort_columns).reset_index(drop=True)
+                for key, group in stats.groupby("_fighter_key", sort=False):
+                    stats_by_fighter[key] = group.drop(columns=["_fighter_key"]).reset_index(drop=True)
+            if "fight_id" in stats.columns:
+                for fight_id, group in stats.groupby("fight_id", sort=False):
+                    if "_fighter_key" in group.columns:
+                        group = group.drop(columns=["_fighter_key"])
+                    stats_by_fight_id[fight_id] = group.reset_index(drop=True)
+
+        return cls(
+            history_by_fighter=history_by_fighter,
+            fighter_bio_by_name=fighter_bio_by_name,
+            stats_by_fighter=stats_by_fighter,
+            stats_by_fight_id=stats_by_fight_id,
+        )
+
+    def fighter_fight_history(self, fighter: str, as_of_date: object) -> pd.DataFrame:
+        history = self.history_by_fighter.get(_name_key(fighter))
+        if history is None or history.empty:
+            return pd.DataFrame()
+        dates = pd.to_datetime(history["fight_date"], errors="coerce")
+        cutoff = dates.searchsorted(pd.Timestamp(as_of_date), side="left")
+        output = history.iloc[:cutoff].copy()
+        assert_history_is_before(output, as_of_date)
+        return output
+
+    def fighter_bio(self, fighter: str, as_of_date: object) -> dict[str, Any]:
+        output: dict[str, Any] = {"stance": "Unknown", "height_in": 0.0, "weight_lb": 0.0, "reach_in": 0.0, "age": 0.0}
+        row = self.fighter_bio_by_name.get(_name_key(fighter))
+        if row is None:
+            return output
+        output["stance"] = _normal(row.get("stance")) or "Unknown"
+        output["height_in"] = parse_height_to_inches(row.get("height_in", row.get("height", 0)))
+        output["weight_lb"] = _numeric(row.get("weight_lb", row.get("weight", 0)))
+        output["reach_in"] = parse_height_to_inches(row.get("reach_in", row.get("reach", 0)))
+        dob = pd.to_datetime(row.get("date_of_birth", row.get("dob", None)), errors="coerce")
+        if pd.notna(dob):
+            output["age"] = max((pd.Timestamp(as_of_date) - dob).days / 365.25, 0.0)
+        return output
+
+    def stats_for_history(self, history: pd.DataFrame, fighter: str) -> pd.DataFrame:
+        if history.empty or "fight_id" not in history.columns:
+            return pd.DataFrame()
+        stats = self.stats_by_fighter.get(_name_key(fighter))
+        if stats is None or stats.empty or "fight_id" not in stats.columns:
+            return pd.DataFrame()
+        fight_ids = set(history["fight_id"].tolist())
+        return stats[stats["fight_id"].isin(fight_ids)].sort_values("fight_date").copy()
+
+    def opponent_stats_for_history(self, history: pd.DataFrame, fighter: str) -> pd.DataFrame:
+        if history.empty or "fight_id" not in history.columns:
+            return pd.DataFrame()
+        frames = [self.stats_by_fight_id[fight_id] for fight_id in history["fight_id"].tolist() if fight_id in self.stats_by_fight_id]
+        if not frames:
+            return pd.DataFrame()
+        stats = pd.concat(frames, ignore_index=True)
+        if "fighter" not in stats.columns:
+            return pd.DataFrame()
+        return stats[stats["fighter"].map(_name_key) != _name_key(fighter)].copy()
 
 
 def _fighter_bio(fighters: pd.DataFrame | None, fighter: str, as_of_date: object) -> dict[str, Any]:
@@ -407,13 +530,14 @@ def compute_fighter_snapshot(
     fighters: pd.DataFrame | None = None,
     scorecards: pd.DataFrame | None = None,
     weight_class: str | None = None,
+    context: FighterHistoryContext | None = None,
 ) -> dict[str, Any]:
     """Compute one fighter's pre-fight feature snapshot using only prior fights."""
 
     snapshot: dict[str, Any] = dict(SNAPSHOT_NUMERIC_DEFAULTS)
-    snapshot.update(_fighter_bio(fighters, fighter, as_of_date))
+    snapshot.update(context.fighter_bio(fighter, as_of_date) if context is not None else _fighter_bio(fighters, fighter, as_of_date))
     snapshot["fighter"] = _normal(fighter)
-    history = fighter_fight_history(fights, fighter, as_of_date)
+    history = context.fighter_fight_history(fighter, as_of_date) if context is not None else fighter_fight_history(fights, fighter, as_of_date)
     if history.empty:
         snapshot["max_history_date_used"] = pd.NaT
         return snapshot
@@ -466,8 +590,12 @@ def compute_fighter_snapshot(
             snapshot["worst_loss_elo"] = float(loss_elos.min()) if not loss_elos.empty else 1500.0
 
     snapshot.update(_finish_flags(history, fighter))
-    stats = _stats_for_history(fight_stats, history, fighter)
-    opponent_stats = _opponent_stats_for_history(fight_stats, history, fighter)
+    stats = context.stats_for_history(history, fighter) if context is not None else _stats_for_history(fight_stats, history, fighter)
+    opponent_stats = (
+        context.opponent_stats_for_history(history, fighter)
+        if context is not None
+        else _opponent_stats_for_history(fight_stats, history, fighter)
+    )
     snapshot.update(_stat_features(stats, opponent_stats, history))
     trend_history = _enriched_history_for_trends(history, stats, opponent_stats)
     snapshot.update(compute_recent_trend_features(trend_history))
