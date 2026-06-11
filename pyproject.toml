@@ -27,7 +27,10 @@ dependencies = [
 xgboost = ["xgboost>=2.0"]
 lightgbm = ["lightgbm>=4.0"]
 explain = ["shap>=0.44"]
-dev = ["pytest>=7.4"]
+dev = [
+  "pytest>=8.0",
+  "pytest-cov>=5.0"
+]
 
 [project.scripts]
 ufc-predict = "ufc_predictor.cli:app"

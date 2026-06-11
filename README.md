@@ -18,6 +18,21 @@ pip install -e ".[dev]"
 
 Python 3.11+ is required.
 
+## New Codespace Setup
+
+Open the repository in GitHub Codespaces. The devcontainer uses Python 3.11 and automatically runs:
+
+```bash
+python -m pip install --upgrade pip && python -m pip install -e ".[dev]"
+```
+
+After setup, the `ufc-predict` CLI should be available in the Codespace terminal:
+
+```bash
+ufc-predict --help
+python -m pytest
+```
+
 ## Data Layout
 
 ```text
