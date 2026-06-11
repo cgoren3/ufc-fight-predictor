@@ -264,6 +264,32 @@ ufc-predict backtest
 
 Rolling backtest trains on all fights before each period, predicts the next period, and rolls forward. Metrics include accuracy, log loss, Brier score, ROC AUC, calibration curve data, expected calibration error, performance by confidence tier, year, weight class, main event, men/women when supplied, underdog performance when odds are supplied, and baselines such as better record, higher Elo, and betting favorite when available.
 
+## Audit, Odds, And Reports
+
+Run a random no-leakage audit against processed training rows:
+
+```bash
+ufc-predict leakage-audit --sample-size 100
+```
+
+Optional odds imports use `data/raw/imports/odds.csv`:
+
+```text
+fight_date,fighter_a,fighter_b,sportsbook,fighter_a_odds,fighter_b_odds,timestamp
+```
+
+```bash
+ufc-predict import-odds
+```
+
+American odds are converted to implied probabilities for analytical model-vs-market comparison only. The project does not provide betting advice.
+
+Training saves `models/model_card.json`, and reports can be generated with:
+
+```bash
+ufc-predict report
+```
+
 ## Predict
 
 ```bash

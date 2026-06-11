@@ -11,7 +11,12 @@ from ufc_predictor.config import settings
 from ufc_predictor.features.elo import EloSystem
 from ufc_predictor.features.fighter_history import compute_fighter_snapshot
 from ufc_predictor.features.style_features import compute_style_matchup_features
-from ufc_predictor.models.explain import top_reasons_from_features
+from ufc_predictor.models.explain import (
+    missing_data_warnings_from_features,
+    top_factors_by_side,
+    top_reasons_from_features,
+    uncertainty_factors_from_features,
+)
 
 
 WARNING_TEXT = "Prediction is not guaranteed. Confidence is based on calibrated historical performance."
@@ -46,6 +51,11 @@ def format_prediction_output(
     fighter_b: str,
     fighter_a_win_probability: float,
     top_factors: list[str] | None = None,
+    uncertainty_range: list[float] | None = None,
+    top_factors_for_fighter_a: list[str] | None = None,
+    top_factors_for_fighter_b: list[str] | None = None,
+    biggest_uncertainty_factors: list[str] | None = None,
+    missing_data_warnings: list[str] | None = None,
 ) -> dict[str, Any]:
     prob_a, prob_b = normalize_probability_pair(fighter_a_win_probability)
     predicted_winner = fighter_a if prob_a >= prob_b else fighter_b
@@ -56,9 +66,15 @@ def format_prediction_output(
         "predicted_winner": predicted_winner,
         "fighter_a_win_probability": round(prob_a, 4),
         "fighter_b_win_probability": round(prob_b, 4),
+        "calibrated_probability": round(prob_a, 4),
         "confidence_score": round(confidence_score, 4),
         "confidence_tier": confidence_tier(confidence_score),
+        "uncertainty_range": uncertainty_range or [round(prob_a, 4), round(prob_a, 4)],
         "top_factors_for_prediction": top_factors or [],
+        "top_factors_favoring_fighter_a": top_factors_for_fighter_a or [],
+        "top_factors_favoring_fighter_b": top_factors_for_fighter_b or [],
+        "biggest_uncertainty_factors": biggest_uncertainty_factors or [],
+        "missing_data_warnings": missing_data_warnings or [],
         "warning": WARNING_TEXT,
     }
 
@@ -72,6 +88,9 @@ def neutral_prediction_output(
     output["predicted_winner"] = "Unknown / Toss-up"
     output["confidence_score"] = 0.5
     output["confidence_tier"] = "Low"
+    output["uncertainty_range"] = [0.5, 0.5]
+    output["biggest_uncertainty_factors"] = [reason]
+    output["missing_data_warnings"] = [reason]
     return output
 
 
@@ -250,13 +269,27 @@ def predict_fight(
     if bundle is not None:
         try:
             prob_a = float(bundle.predict_proba(row)[:, 1][0])
+            uncertainty = bundle.uncertainty_range(row)[0] if hasattr(bundle, "uncertainty_range") else [prob_a, prob_a]
         except Exception:
             prob_a = float(row.get("fighter_a_elo_expected_win_probability", pd.Series([0.5])).iloc[0])
+            uncertainty = [prob_a, prob_a]
     else:
         prob_a = float(row.get("fighter_a_elo_expected_win_probability", pd.Series([0.5])).iloc[0])
+        uncertainty = [prob_a, prob_a]
     predicted = fighter_a if prob_a >= 0.5 else fighter_b
     reasons = top_reasons_from_features(row.iloc[0], fighter_a, fighter_b, predicted_winner=predicted, max_reasons=10)
-    return format_prediction_output(fighter_a, fighter_b, prob_a, reasons)
+    a_factors, b_factors = top_factors_by_side(row.iloc[0], fighter_a, fighter_b, max_reasons=5)
+    return format_prediction_output(
+        fighter_a,
+        fighter_b,
+        prob_a,
+        reasons,
+        uncertainty_range=uncertainty,
+        top_factors_for_fighter_a=a_factors,
+        top_factors_for_fighter_b=b_factors,
+        biggest_uncertainty_factors=uncertainty_factors_from_features(row.iloc[0]),
+        missing_data_warnings=missing_data_warnings_from_features(row.iloc[0]),
+    )
 
 
 def prediction_to_json(prediction: dict[str, Any]) -> str:

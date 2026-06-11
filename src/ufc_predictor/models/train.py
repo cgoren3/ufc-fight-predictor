@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import pickle
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +12,7 @@ import pandas as pd
 from pandas.api.types import is_numeric_dtype
 
 from ufc_predictor.config import settings
+from ufc_predictor.data_sources import read_source_metadata
 from ufc_predictor.features.build_fight_dataset import feature_columns
 from ufc_predictor.models.calibrate import calibrate_estimator
 from ufc_predictor.models.evaluate import baseline_metrics, evaluate_predictions
@@ -44,8 +45,9 @@ class TrainedModelBundle:
     categorical_features: list[str]
     dropped_all_null_features: list[str] = field(default_factory=list)
     feature_summary: dict[str, Any] = field(default_factory=dict)
+    model_card: dict[str, Any] = field(default_factory=dict)
     metrics: dict[str, Any] = field(default_factory=dict)
-    created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def _align(self, frame: pd.DataFrame) -> pd.DataFrame:
         aligned = frame.copy()
@@ -66,6 +68,24 @@ class TrainedModelBundle:
         row_sums = average.sum(axis=1, keepdims=True)
         row_sums[row_sums == 0] = 1.0
         return average / row_sums
+
+    def member_probabilities(self, frame: pd.DataFrame) -> np.ndarray:
+        aligned = self._align(frame)
+        if not self.estimators:
+            return np.empty((0, len(aligned)))
+        probabilities = []
+        for estimator in self.estimators:
+            probabilities.append(estimator.predict_proba(aligned)[:, 1])
+        return np.asarray(probabilities, dtype=float)
+
+    def uncertainty_range(self, frame: pd.DataFrame) -> list[list[float]]:
+        member_probs = self.member_probabilities(frame)
+        if member_probs.size == 0:
+            mean = self.predict_proba(frame)[:, 1]
+            return [[round(float(value), 4), round(float(value), 4)] for value in mean]
+        lower = np.nanmin(member_probs, axis=0)
+        upper = np.nanmax(member_probs, axis=0)
+        return [[round(float(max(low, 0.0)), 4), round(float(min(high, 1.0)), 4)] for low, high in zip(lower, upper)]
 
 
 def _imports():
@@ -233,7 +253,7 @@ def train_ensemble(
         fitted.model_name = name  # type: ignore[attr-defined]
         estimators.append(fitted)
     bundle = TrainedModelBundle(
-        model_version=f"ufc_predictor_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}",
+        model_version=f"ufc_predictor_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
         estimators=estimators,
         feature_columns=columns,
         numeric_features=numeric,
@@ -247,9 +267,45 @@ def train_ensemble(
         probabilities = bundle.predict_proba(test_frame[columns])[:, 1]
         metrics.update(evaluate_predictions(test_frame["fighter_a_win"], probabilities, metadata=test_frame))
     bundle.metrics = metrics
+    bundle.model_card = build_model_card(bundle, dataset)
     if save:
         save_model_bundle(bundle, model_dir=model_dir)
     return bundle
+
+
+def build_model_card(bundle: TrainedModelBundle, dataset: pd.DataFrame) -> dict[str, Any]:
+    dates = pd.to_datetime(dataset.get("fight_date", pd.Series(dtype=object)), errors="coerce").dropna()
+    high_confidence = bundle.metrics.get("performance_by_confidence_tier", {}).get("High", {})
+    known_weaknesses = [
+        "Historical MMA data can be incomplete or inconsistently sourced.",
+        "Late-breaking injuries, camps, weight misses, and opponent changes are not reliably modeled unless imported manually.",
+        "Predictions are calibrated historical probabilities, not guarantees and not betting advice.",
+    ]
+    if bundle.dropped_all_null_features:
+        known_weaknesses.append(
+            "Some features were dropped because they were completely missing: "
+            + ", ".join(bundle.dropped_all_null_features[:10])
+        )
+    if "market_fighter_a_implied_probability" not in dataset.columns:
+        known_weaknesses.append("No betting odds were attached for market comparison in this training run.")
+    return {
+        "training_date": datetime.now(timezone.utc).isoformat(),
+        "data_source": read_source_metadata(settings.raw_data_dir).get("source", "unknown"),
+        "date_range": {
+            "start": dates.min().date().isoformat() if not dates.empty else None,
+            "end": dates.max().date().isoformat() if not dates.empty else None,
+        },
+        "number_of_training_rows": int(len(dataset)),
+        "feature_count": int(len(bundle.feature_columns)),
+        "dropped_features": bundle.dropped_all_null_features,
+        "model_type": [getattr(estimator, "model_name", type(estimator).__name__) for estimator in bundle.estimators],
+        "accuracy": bundle.metrics.get("accuracy"),
+        "log_loss": bundle.metrics.get("log_loss"),
+        "brier_score": bundle.metrics.get("brier_score"),
+        "calibration_error": bundle.metrics.get("expected_calibration_error"),
+        "high_confidence_accuracy": high_confidence.get("accuracy"),
+        "known_weaknesses": known_weaknesses,
+    }
 
 
 def save_model_bundle(bundle: TrainedModelBundle, model_dir: str | Path | None = None) -> Path:
@@ -266,9 +322,11 @@ def save_model_bundle(bundle: TrainedModelBundle, model_dir: str | Path | None =
         "categorical_features": bundle.categorical_features,
         "dropped_all_null_features": bundle.dropped_all_null_features,
         "feature_summary": bundle.feature_summary,
+        "model_card": bundle.model_card,
         "metrics": bundle.metrics,
     }
     (output_dir / "model_metadata.json").write_text(json.dumps(metadata, indent=2, default=str), encoding="utf-8")
+    (output_dir / "model_card.json").write_text(json.dumps(bundle.model_card, indent=2, default=str), encoding="utf-8")
     return path
 
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
@@ -52,6 +52,8 @@ def evaluate_predictions(
             metrics["performance_by_men_women"] = _metadata_group(metadata, y_true_array, y_pred, "sex")
         if "closing_odds_favorite_is_a" in metadata.columns:
             metrics["performance_on_underdogs"] = _underdog_performance(metadata, y_true_array, y_pred)
+        if "market_fighter_a_implied_probability" in metadata.columns:
+            metrics["model_vs_market"] = _model_vs_market(metadata, y_true_array, y_prob_array)
     return metrics
 
 
@@ -84,6 +86,29 @@ def _underdog_performance(metadata: pd.DataFrame, y_true: np.ndarray, y_pred: np
     }
 
 
+def _model_vs_market(metadata: pd.DataFrame, y_true: np.ndarray, y_prob: np.ndarray) -> dict[str, float | str]:
+    market = pd.to_numeric(metadata["market_fighter_a_implied_probability"], errors="coerce").to_numpy(dtype=float)
+    valid = ~np.isnan(market)
+    if not valid.any():
+        return {"count": 0.0, "note": "No matched odds rows available for model-vs-market analysis."}
+    model_prob = y_prob[valid]
+    market_prob = _clip_probs(market[valid])
+    target = y_true[valid]
+    model_pred = (model_prob >= 0.5).astype(int)
+    market_pred = (market_prob >= 0.5).astype(int)
+    return {
+        "count": float(valid.sum()),
+        "mean_model_probability": float(np.mean(model_prob)),
+        "mean_market_probability": float(np.mean(market_prob)),
+        "mean_absolute_probability_delta": float(np.mean(np.abs(model_prob - market_prob))),
+        "model_accuracy": float((model_pred == target).mean()),
+        "market_accuracy": float((market_pred == target).mean()),
+        "model_log_loss": float(-(target * np.log(_clip_probs(model_prob)) + (1 - target) * np.log(1 - _clip_probs(model_prob))).mean()),
+        "market_log_loss": float(-(target * np.log(market_prob) + (1 - target) * np.log(1 - market_prob)).mean()),
+        "note": "Model-vs-market edge is analytical only and is not betting advice.",
+    }
+
+
 def baseline_metrics(dataset: pd.DataFrame) -> dict[str, Any]:
     if dataset.empty:
         return {}
@@ -100,7 +125,9 @@ def baseline_metrics(dataset: pd.DataFrame) -> dict[str, Any]:
     if "diff_pre_fight_elo" in dataset.columns:
         baselines["pick_higher_elo"] = (dataset["diff_pre_fight_elo"].fillna(0) >= 0).astype(int).to_numpy()
     if "closing_odds_favorite_is_a" in dataset.columns:
-        baselines["pick_betting_favorite"] = dataset["closing_odds_favorite_is_a"].astype(int).to_numpy()
+        favorite = dataset["closing_odds_favorite_is_a"]
+        if favorite.notna().any():
+            baselines["pick_betting_favorite"] = favorite.fillna(False).astype(bool).astype(int).to_numpy()
     return {
         name: {"accuracy": float((prediction == target).mean()), "count": float(len(target))}
         for name, prediction in baselines.items()
@@ -111,7 +138,7 @@ def save_backtest_result(metrics: dict[str, Any], path: str | Path | None = None
     output = Path(path) if path else settings.processed_data_dir / "backtest_results.json"
     output.parent.mkdir(parents=True, exist_ok=True)
     serializable = json.loads(json.dumps(metrics, default=str))
-    serializable["created_at"] = datetime.utcnow().isoformat()
+    serializable["created_at"] = datetime.now(timezone.utc).isoformat()
     output.write_text(json.dumps(serializable, indent=2), encoding="utf-8")
     return output
 

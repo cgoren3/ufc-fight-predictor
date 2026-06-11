@@ -11,6 +11,7 @@ venv/
 # Generated model artifacts
 models/*.pkl
 models/model_metadata.json
+models/model_card.json
 
 # Generated processed datasets and backtests
 data/processed/

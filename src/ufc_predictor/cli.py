@@ -225,6 +225,22 @@ def import_csv(
         _print(f"- {name}: {path}")
 
 
+@app.command("import-odds")
+def import_odds(
+    import_path: Path = typer.Option(settings.raw_data_dir / "imports" / "odds.csv", help="Raw odds CSV import path."),
+    output_path: Path = typer.Option(settings.raw_data_dir / "odds.csv", help="Normalized odds CSV output path."),
+) -> None:
+    from ufc_predictor.data_io import InputDataError
+    from ufc_predictor.odds import import_odds_csv
+
+    try:
+        frame = import_odds_csv(import_path=import_path, output_path=output_path)
+    except InputDataError as exc:
+        _runtime_error(f"Odds import failed:\n{exc}")
+    _print(f"Imported {len(frame)} odds rows to {output_path}")
+    _print("Converted American odds to implied probabilities for analysis only. This is not betting advice.")
+
+
 @app.command("dataset-columns")
 def dataset_columns(
     source: Path = typer.Option(..., "--source", help="Folder containing downloaded Kaggle/third-party UFC CSV files."),
@@ -340,12 +356,41 @@ def load_scorecards(
     _print(f"Imported {len(frame)} scorecard rows.")
 
 
+@app.command("leakage-audit")
+def leakage_audit(
+    sample_size: int = typer.Option(100, "--sample-size", help="Number of processed training rows to audit."),
+    dataset_path: Path = typer.Option(_default_dataset_path(), help="Processed fight dataset."),
+    fights_csv: Path = typer.Option(settings.raw_data_dir / "fights.csv", help="Raw fights CSV."),
+    output: Path = typer.Option(settings.processed_data_dir / "leakage_audit.json", help="Leakage audit JSON output."),
+) -> None:
+    from ufc_predictor.features.leakage_audit import run_leakage_audit, save_leakage_audit_report
+
+    if sample_size <= 0:
+        _runtime_error("--sample-size must be greater than 0.")
+    dataset = _read_dataset(dataset_path)
+    try:
+        fights = read_required_csv(fights_csv, required_columns=REQUIRED_FIGHT_COLUMNS, label="fights CSV")
+    except InputDataError as exc:
+        _runtime_error(str(exc))
+    result = run_leakage_audit(dataset, fights, sample_size=sample_size)
+    path = save_leakage_audit_report(result, output)
+    _print(f"Leakage audit sampled rows: {result.sampled_rows}")
+    _print(f"Passed rows: {result.passed_rows}")
+    _print(f"Violations: {len(result.violations)}")
+    for warning in result.warnings:
+        _print(f"[yellow]Warning: {warning}[/yellow]")
+    _print(f"Wrote leakage audit report to {path}")
+    if not result.passed:
+        raise typer.Exit(1)
+
+
 @app.command("build-dataset")
 def build_dataset(
     fights_csv: Path = typer.Option(settings.raw_data_dir / "fights.csv", help="Raw fights CSV."),
     fight_stats_csv: Path = typer.Option(settings.raw_data_dir / "fight_stats.csv", help="Optional fight stats CSV."),
     fighters_csv: Path = typer.Option(settings.raw_data_dir / "fighters.csv", help="Optional fighters CSV."),
     scorecards_csv: Path = typer.Option(settings.raw_data_dir / "scorecards.csv", help="Optional scorecards CSV."),
+    odds_csv: Path = typer.Option(settings.raw_data_dir / "odds.csv", help="Optional betting odds CSV."),
     output: Path = typer.Option(settings.processed_data_dir / "fight_dataset.parquet", help="Output dataset path."),
     two_way: bool = typer.Option(False, help="Create both fighter orderings for each fight."),
     randomize_order: bool = typer.Option(False, help="Randomize fighter order once per fight."),
@@ -376,6 +421,7 @@ def build_dataset(
             fight_stats_csv = raw_output_dir / "fight_stats.csv"
             fighters_csv = raw_output_dir / "fighters.csv"
             scorecards_csv = raw_output_dir / "scorecards.csv"
+            odds_csv = raw_output_dir / "odds.csv"
         source_metadata = read_source_metadata(raw_output_dir)
         if source_metadata.get("source") == SOURCE_SAMPLE:
             _runtime_error(
@@ -390,6 +436,7 @@ def build_dataset(
         fight_stats = read_optional_csv(fight_stats_csv, label="fight stats CSV")
         fighters = read_optional_csv(fighters_csv, label="fighters CSV")
         scorecards = read_optional_csv(scorecards_csv, label="scorecards CSV")
+    odds = read_optional_csv(odds_csv, label="odds CSV")
 
     if verbose:
         _print(
@@ -421,6 +468,16 @@ def build_dataset(
             limit=limit,
             progress_callback=print_progress,
         )
+        if odds is not None:
+            from ufc_predictor.odds import attach_odds_features
+
+            build_report = dataset.attrs.get("build_report")
+            dataset = attach_odds_features(dataset, odds)
+            if build_report is not None:
+                dataset.attrs["build_report"] = build_report
+            if verbose:
+                matched = int(pd.to_numeric(dataset.get("market_fighter_a_implied_probability"), errors="coerce").notna().sum())
+                _print(f"Attached odds features for {matched} training rows.")
         path = save_dataset(dataset, output)
     except BuildDatasetError as exc:
         cause = exc.__cause__ or exc
@@ -464,6 +521,28 @@ def build_dataset(
             f"[yellow]Warning: only {len(dataset)} training rows were built. "
             f"Model results will be unstable below {TINY_DATASET_WARNING_THRESHOLD} rows.[/yellow]"
         )
+
+
+@app.command("report")
+def report(
+    output: Path = typer.Option(settings.processed_data_dir / "performance_report.json", help="Performance report JSON output."),
+) -> None:
+    from ufc_predictor.reporting import build_performance_report, save_performance_report
+
+    payload = build_performance_report()
+    path = save_performance_report(payload, output)
+    dataset = payload["dataset_size"]
+    train_metrics = payload["train_metrics"]
+    backtest_metrics = payload["backtest_metrics"]
+    _print("Performance report")
+    _print(f"Dataset fights: {dataset.get('fights', 0)}")
+    _print(f"Dataset date range: {dataset.get('date_range', {}).get('start')} to {dataset.get('date_range', {}).get('end')}")
+    _print(f"Train accuracy: {train_metrics.get('accuracy')}")
+    _print(f"Backtest accuracy: {backtest_metrics.get('accuracy')}")
+    _print(f"Backtest calibration error: {backtest_metrics.get('expected_calibration_error')}")
+    for issue in payload.get("known_missing_data_issues", []):
+        _print(f"[yellow]Missing data issue: {issue}[/yellow]")
+    _print(f"Wrote performance report to {path}")
 
 
 @app.command("train")
