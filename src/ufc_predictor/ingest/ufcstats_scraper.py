@@ -16,6 +16,34 @@ from ufc_predictor.data_io import InputDataError, inspect_csv
 class UFCStatsScraperError(RuntimeError):
     """Raised when UFCStats scraping cannot produce a usable raw dataset."""
 
+    def __init__(self, message: str, diagnostics: "FetchDiagnostics | None" = None):
+        super().__init__(message)
+        self.diagnostics = diagnostics
+
+
+@dataclass
+class FetchDiagnostics:
+    requested_url: str
+    status_code: int | None = None
+    exception_type: str | None = None
+    exception_message: str | None = None
+    body_preview: str = ""
+    cached_data_used: bool = False
+    attempts: int = 0
+
+    def format(self) -> str:
+        lines = [
+            f"Requested URL: {self.requested_url}",
+            f"HTTP status code: {self.status_code if self.status_code is not None else 'n/a'}",
+            f"Exception type: {self.exception_type or 'n/a'}",
+            f"Exception message: {self.exception_message or 'n/a'}",
+            f"Cached data used: {self.cached_data_used}",
+            f"Attempts: {self.attempts}",
+            "Body preview:",
+            self.body_preview[:500] if self.body_preview else "n/a",
+        ]
+        return "\n".join(lines)
+
 
 EVENT_COLUMNS = ["name", "event_date", "location", "source_url", "raw_details"]
 FIGHT_COLUMNS = [
@@ -53,6 +81,16 @@ FIGHT_STAT_COLUMNS = [
     "leg_landed",
 ]
 FIGHTER_COLUMNS = ["name", "stance", "height_in", "weight_lb", "reach_in", "date_of_birth", "record", "source_url"]
+DEFAULT_COMPLETED_EVENTS_URL = "https://www.ufcstats.com/statistics/events/completed?page=all"
+DEFAULT_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+    ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Connection": "keep-alive",
+}
 
 
 def _slug(value: str) -> str:
@@ -102,6 +140,25 @@ def _pair_values(cell: Any) -> list[str]:
     return [text, text] if text else ["", ""]
 
 
+def _soup_from_html(html: str) -> Any:
+    try:
+        from bs4 import BeautifulSoup
+    except Exception as exc:  # pragma: no cover - depends on environment
+        raise RuntimeError("beautifulsoup4 is required for scraping.") from exc
+    return BeautifulSoup(html, "html.parser")
+
+
+def _event_links_from_soup(soup: Any) -> list[str]:
+    links: list[str] = []
+    for anchor in soup.select('a[href*="/event-details/"]'):
+        href = anchor.get("href")
+        if href and "/event-details/" in href:
+            if href.startswith("/"):
+                href = f"https://www.ufcstats.com{href}"
+            links.append(href)
+    return list(dict.fromkeys(links))
+
+
 @dataclass
 class UFCStatsScraper:
     """Respectful UFCStats scraper with cache, retries, rate limiting, and resume support."""
@@ -111,6 +168,7 @@ class UFCStatsScraper:
     delay_seconds: float = settings.scrape_delay_seconds
     retry_count: int = settings.retry_count
     timeout_seconds: int = settings.request_timeout_seconds
+    backoff_base_seconds: float = 1.0
     base_url: str = "https://www.ufcstats.com"
     session: Any = field(default=None, init=False)
     _last_request_at: float = field(default=0.0, init=False)
@@ -125,7 +183,10 @@ class UFCStatsScraper:
             except Exception as exc:  # pragma: no cover - depends on environment
                 raise RuntimeError("requests is required for scraping. Install project dependencies.") from exc
             self.session = requests.Session()
-            self.session.headers.update({"User-Agent": self.user_agent})
+            headers = DEFAULT_HEADERS.copy()
+            if self.user_agent and self.user_agent != settings.user_agent:
+                headers["User-Agent"] = self.user_agent
+            self.session.headers.update(headers)
         return self.session
 
     def _cache_path(self, url: str) -> Path:
@@ -140,47 +201,81 @@ class UFCStatsScraper:
             if cached.strip():
                 return cached
             cache_path.unlink(missing_ok=True)
+        diagnostics = self.fetch_diagnostics(url, force=force)
+        if diagnostics.exception_type is None and cache_path.exists():
+            return cache_path.read_text(encoding="utf-8")
+        raise UFCStatsScraperError(
+            f"Failed to fetch {url}. Check network access, UFCStats availability, "
+            "and the local scraper cache under data/raw/cache.",
+            diagnostics=diagnostics,
+        )
+
+    def fetch_diagnostics(self, url: str, force: bool = True) -> FetchDiagnostics:
+        """Probe a URL and return diagnostics without hiding HTTP/network details."""
+
+        cache_path = self._cache_path(url)
+        if cache_path.exists() and not force:
+            cached = cache_path.read_text(encoding="utf-8")
+            if cached.strip():
+                return FetchDiagnostics(
+                    requested_url=url,
+                    status_code=None,
+                    body_preview=cached[:500],
+                    cached_data_used=True,
+                    attempts=0,
+                )
         elapsed = time.monotonic() - self._last_request_at
         if elapsed < self.delay_seconds:
             time.sleep(self.delay_seconds - elapsed)
         session = self._ensure_session()
-        last_error: Exception | None = None
-        for attempt in range(self.retry_count):
+        diagnostics = FetchDiagnostics(requested_url=url)
+        attempts = max(self.retry_count, 1)
+        for attempt in range(attempts):
+            diagnostics.attempts = attempt + 1
             try:
                 response = session.get(url, timeout=self.timeout_seconds)
+                diagnostics.status_code = response.status_code
+                diagnostics.body_preview = response.text[:500] if response.text else ""
                 response.raise_for_status()
                 self._last_request_at = time.monotonic()
                 cache_path.write_text(response.text, encoding="utf-8")
-                return response.text
+                diagnostics.cached_data_used = False
+                return diagnostics
             except Exception as exc:  # pragma: no cover - network dependent
-                last_error = exc
-                time.sleep(min(2**attempt, 10))
-        raise UFCStatsScraperError(
-            f"Failed to fetch {url}. Check network access, UFCStats availability, "
-            "and the local scraper cache under data/raw/cache."
-        ) from last_error
+                diagnostics.exception_type = type(exc).__name__
+                diagnostics.exception_message = str(exc)
+                if hasattr(exc, "response") and exc.response is not None:
+                    diagnostics.status_code = getattr(exc.response, "status_code", diagnostics.status_code)
+                    diagnostics.body_preview = getattr(exc.response, "text", "")[:500]
+                if attempt < attempts - 1:
+                    time.sleep(min(self.backoff_base_seconds * (2**attempt), 10.0))
+        return diagnostics
 
     def soup(self, url: str) -> Any:
-        try:
-            from bs4 import BeautifulSoup
-        except Exception as exc:  # pragma: no cover - depends on environment
-            raise RuntimeError("beautifulsoup4 is required for scraping.") from exc
-        return BeautifulSoup(self.fetch(url), "html.parser")
+        return _soup_from_html(self.fetch(url))
 
     def scrape_event_links(self, completed_only: bool = True) -> list[str]:
         suffix = "statistics/events/completed?page=all" if completed_only else "statistics/events/search?page=all"
         soup = self.soup(f"{self.base_url}/{suffix}")
-        links: list[str] = []
-        for anchor in soup.select('a[href*="/event-details/"]'):
-            href = anchor.get("href")
-            if href and "/event-details/" in href:
-                links.append(href)
-        links = list(dict.fromkeys(links))
+        links = _event_links_from_soup(soup)
         if not links:
             raise UFCStatsScraperError(
                 "No UFCStats event links were found on the completed-events page. "
                 "The site layout may have changed, the response may be blocked, or "
                 "a stale/empty cache file may be present under data/raw/cache."
+            )
+        return links
+
+    def scrape_event_links_from_html(self, html_path: str | Path) -> list[str]:
+        path = Path(html_path)
+        if not path.exists():
+            raise UFCStatsScraperError(f"Manual UFCStats HTML file not found: {path}")
+        html = path.read_text(encoding="utf-8")
+        links = _event_links_from_soup(_soup_from_html(html))
+        if not links:
+            raise UFCStatsScraperError(
+                f"No UFCStats event links were found in manual HTML file: {path}. "
+                "Make sure it is the completed-events page HTML from UFCStats."
             )
         return links
 
@@ -346,6 +441,7 @@ class UFCStatsScraper:
         max_events: int | None = None,
         resume_file: str | Path | None = None,
         ignore_resume: bool = False,
+        event_links: list[str] | None = None,
     ) -> tuple[pd.DataFrame, pd.DataFrame]:
         """Scrape event and fight-card rows.
 
@@ -360,7 +456,7 @@ class UFCStatsScraper:
 
         event_rows: list[dict[str, Any]] = []
         fight_rows: list[dict[str, Any]] = []
-        links = self.scrape_event_links()
+        links = event_links if event_links is not None else self.scrape_event_links()
         if max_events is not None:
             links = links[:max_events]
         for link in links:
@@ -390,10 +486,16 @@ class UFCStatsScraper:
         max_events: int | None = None,
         include_details: bool = False,
         ignore_resume: bool = False,
+        from_html: str | Path | None = None,
     ) -> dict[str, Path]:
         output = Path(output_dir) if output_dir else settings.raw_data_dir
         output.mkdir(parents=True, exist_ok=True)
-        events, fights = self.scrape_events(max_events=max_events, ignore_resume=ignore_resume)
+        event_links = self.scrape_event_links_from_html(from_html) if from_html else None
+        events, fights = self.scrape_events(
+            max_events=max_events,
+            ignore_resume=ignore_resume or from_html is not None,
+            event_links=event_links,
+        )
         if not fights.empty and "fight_id" not in fights.columns:
             fights = fights.reset_index(drop=True)
             fights["fight_id"] = fights.index
@@ -440,3 +542,47 @@ class UFCStatsScraper:
             pd.DataFrame(fight_stats_rows, columns=FIGHT_STAT_COLUMNS).to_csv(paths["fight_stats"], index=False)
             pd.DataFrame(fighter_rows.values(), columns=FIGHTER_COLUMNS).to_csv(paths["fighters"], index=False)
         return paths
+
+
+def check_completed_events_page() -> FetchDiagnostics:
+    return UFCStatsScraper().fetch_diagnostics(DEFAULT_COMPLETED_EVENTS_URL, force=True)
+
+
+def import_raw_csvs(
+    import_dir: str | Path,
+    output_dir: str | Path | None = None,
+) -> dict[str, Path]:
+    source = Path(import_dir)
+    output = Path(output_dir) if output_dir else settings.raw_data_dir
+    if not source.exists():
+        raise UFCStatsScraperError(f"CSV import directory not found: {source}")
+    output.mkdir(parents=True, exist_ok=True)
+    required_fights = source / "fights.csv"
+    try:
+        inspect_csv(required_fights, required_columns=["fighter_a", "fighter_b", "fight_date"], label="imported fights CSV")
+    except InputDataError as exc:
+        raise UFCStatsScraperError(str(exc)) from exc
+    paths: dict[str, Path] = {}
+    for name, columns in [
+        ("fights", FIGHT_COLUMNS),
+        ("fighters", FIGHTER_COLUMNS),
+        ("fight_stats", FIGHT_STAT_COLUMNS),
+        ("events", EVENT_COLUMNS),
+    ]:
+        source_file = source / f"{name}.csv"
+        if not source_file.exists():
+            continue
+        frame = pd.read_csv(source_file)
+        if name == "fights":
+            for column in FIGHT_COLUMNS:
+                if column not in frame.columns:
+                    frame[column] = ""
+            frame = frame[FIGHT_COLUMNS]
+        else:
+            frame = frame.reindex(columns=columns)
+        destination = output / f"{name}.csv"
+        frame.to_csv(destination, index=False)
+        paths[name] = destination
+    if "fights" not in paths:
+        raise UFCStatsScraperError(f"CSV import did not write fights.csv from {source}")
+    return paths

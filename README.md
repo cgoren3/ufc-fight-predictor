@@ -75,6 +75,36 @@ If a stale resume file or bad cached page is suspected:
 ufc-predict ingest-ufcstats --ignore-resume
 ```
 
+To diagnose live access from Codespaces or another environment:
+
+```bash
+ufc-predict check-ufcstats
+```
+
+The check prints the requested URL, HTTP status code, exception type/message, body preview, whether cached data was used, and attempt count.
+
+Strict live scraping exits with code 1 on network/site failures and prints diagnostics instead of reporting a bad CLI argument:
+
+```bash
+ufc-predict ingest-ufcstats --no-sample-on-failure
+```
+
+If live discovery of the completed-events page is blocked, manually download the UFCStats completed events HTML page and place it at `data/raw/manual/ufcstats_completed_events.html`, then run:
+
+```bash
+ufc-predict ingest-ufcstats --from-html data/raw/manual/ufcstats_completed_events.html
+```
+
+This uses the local HTML file to discover event links. Event-detail pages still need to be reachable unless you use CSV imports.
+
+To import real raw CSV data instead of scraping, place `fights.csv`, and optionally `fighters.csv`, `fight_stats.csv`, and `events.csv`, under `data/raw/imports/`, then run:
+
+```bash
+ufc-predict ingest-ufcstats --from-csv-imports data/raw/imports
+```
+
+Imported CSV data is treated as real raw input, not sample data. The bundled sample data is only for development and is clearly labeled in command output.
+
 ## Manual Data
 
 Official scorecards can be imported from CSV with these columns:

@@ -21,6 +21,9 @@ if typer is None:  # pragma: no cover - import guard for environments without CL
         class BadParameter(ValueError):
             pass
 
+        class Exit(SystemExit):
+            pass
+
         @staticmethod
         def Option(default=None, *args, **kwargs):
             return default
@@ -69,6 +72,15 @@ def _cli_error(message: str) -> None:
     raise typer.BadParameter(message)
 
 
+def _runtime_error(message: str, code: int = 1) -> None:
+    _print(f"[red]{message}[/red]" if console is not None else message)
+    raise typer.Exit(code)
+
+
+def _print_fetch_diagnostics(diagnostics) -> None:
+    _print(diagnostics.format())
+
+
 def _read_dataset(path: Path) -> pd.DataFrame:
     if path.suffix == ".parquet":
         try:
@@ -102,35 +114,68 @@ def ingest_ufcstats(
     output_dir: Path = typer.Option(settings.raw_data_dir, help="Where raw CSV files should be written."),
     include_details: bool = typer.Option(False, help="Also parse fight detail and fighter profile pages."),
     ignore_resume: bool = typer.Option(False, help="Ignore the local UFCStats resume file."),
+    from_html: Optional[Path] = typer.Option(
+        None,
+        help="Use a manually downloaded UFCStats completed-events HTML page to discover event links.",
+    ),
+    from_csv_imports: Optional[Path] = typer.Option(
+        None,
+        help="Import real raw CSV files from a directory such as data/raw/imports.",
+    ),
     sample_on_failure: bool = typer.Option(
         True,
         "--sample-on-failure/--no-sample-on-failure",
         help="Write bundled sample data if live UFCStats scraping fails.",
     ),
 ) -> None:
-    from ufc_predictor.ingest.ufcstats_scraper import UFCStatsScraper, UFCStatsScraperError
+    from ufc_predictor.ingest.ufcstats_scraper import UFCStatsScraper, UFCStatsScraperError, import_raw_csvs
     from ufc_predictor.sample_data import write_sample_data
 
     settings.ensure_directories()
+    if from_csv_imports is not None:
+        try:
+            paths = import_raw_csvs(from_csv_imports, output_dir=output_dir)
+        except UFCStatsScraperError as exc:
+            _runtime_error(f"CSV import failed:\n{exc}")
+        _print("Imported real raw CSV files:")
+        for name, path in paths.items():
+            _print(f"- {name}: {path}")
+        return
+
     try:
         paths = UFCStatsScraper().run_to_csv(
             output_dir=output_dir,
             max_events=max_events,
             include_details=include_details,
             ignore_resume=ignore_resume,
+            from_html=from_html,
         )
-        _print("Wrote UFCStats CSV files:")
+        _print("Wrote UFCStats CSV files:" if from_html is None else "Wrote UFCStats CSV files from manual HTML link discovery:")
     except UFCStatsScraperError as exc:
         if not sample_on_failure:
-            _cli_error(str(exc))
+            if exc.diagnostics is not None:
+                _print_fetch_diagnostics(exc.diagnostics)
+            _runtime_error(f"UFCStats ingestion failed:\n{exc}")
         _print(f"[yellow]UFCStats ingestion did not produce live data: {exc}[/yellow]")
+        if exc.diagnostics is not None:
+            _print_fetch_diagnostics(exc.diagnostics)
         _print(
             "[yellow]Writing bundled sample/dev data instead so the MVP pipeline can run. "
-            "Use --no-sample-on-failure for strict live scraping.[/yellow]"
+            "Use --no-sample-on-failure for strict live scraping. This data is sample data only.[/yellow]"
         )
         paths = write_sample_data(output_dir)
     for name, path in paths.items():
         _print(f"- {name}: {path}")
+
+
+@app.command("check-ufcstats")
+def check_ufcstats() -> None:
+    from ufc_predictor.ingest.ufcstats_scraper import check_completed_events_page
+
+    diagnostics = check_completed_events_page()
+    _print_fetch_diagnostics(diagnostics)
+    if diagnostics.exception_type is not None:
+        raise typer.Exit(1)
 
 
 @app.command("load-scorecards")
