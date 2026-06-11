@@ -71,6 +71,13 @@ def _print_json(data: dict) -> None:
         print(data)
 
 
+def _metrics_for_console(metrics: dict) -> dict:
+    output = dict(metrics)
+    output.pop("feature_summary", None)
+    output.pop("predictions", None)
+    return output
+
+
 def _cli_error(message: str) -> None:
     _print(f"[red]{message}[/red]" if console is not None else message)
     raise typer.BadParameter(message)
@@ -83,6 +90,25 @@ def _runtime_error(message: str, code: int = 1) -> None:
 
 def _print_fetch_diagnostics(diagnostics) -> None:
     _print(diagnostics.format())
+
+
+def _print_feature_summary(summary) -> None:
+    if hasattr(summary, "as_dict"):
+        data = summary.as_dict()
+    else:
+        data = dict(summary or {})
+    dropped = list(data.get("dropped_all_null_features", []))
+    numeric = list(data.get("numeric_features", []))
+    categorical = list(data.get("categorical_features", []))
+    _print("Feature summary:")
+    _print(f"Total features before cleaning: {data.get('total_features_before_cleaning', 0)}")
+    _print(f"Dropped all-null features: {len(dropped)}")
+    for feature in dropped:
+        _print(f"Dropped all-null feature: {feature}.")
+    _print(f"Numeric features: {len(numeric)}")
+    _print(f"Categorical features: {len(categorical)}")
+    if categorical:
+        _print(f"Categorical feature names: {', '.join(categorical)}")
 
 
 def _format_seconds(seconds: float) -> str:
@@ -450,8 +476,9 @@ def train(
     dataset = _read_dataset(dataset_path)
     bundle = train_ensemble(dataset, model_dir=model_dir, save=False)
     model_path = save_model_bundle(bundle, model_dir=model_dir)
+    _print_feature_summary(bundle.feature_summary)
     _print(f"Saved model to {model_path}")
-    _print_json(bundle.metrics)
+    _print_json(_metrics_for_console(bundle.metrics))
 
 
 @app.command("backtest")
@@ -459,14 +486,32 @@ def backtest(
     dataset_path: Path = typer.Option(_default_dataset_path(), help="Processed fight dataset."),
     output: Path = typer.Option(settings.processed_data_dir / "backtest_results.json", help="Backtest JSON output."),
     min_train_fights: int = typer.Option(50, help="Minimum training rows before a rolling prediction."),
+    step: str = typer.Option("YS", help="Pandas period frequency for rolling backtest, e.g. YS for yearly or MS for monthly."),
 ) -> None:
     from ufc_predictor.models.evaluate import rolling_backtest, save_backtest_result
+    from ufc_predictor.models.train import feature_selection_summary
 
     dataset = _read_dataset(dataset_path)
-    metrics = rolling_backtest(dataset, min_train_fights=min_train_fights)
+    _print_feature_summary(feature_selection_summary(dataset))
+
+    def print_backtest_progress(progress: dict) -> None:
+        if progress.get("status") == "training":
+            _print(
+                "Backtest progress: "
+                f"{progress['period_index']}/{progress['total_periods']} "
+                f"{pd.Timestamp(progress['start']).date()} to {pd.Timestamp(progress['end']).date()} | "
+                f"train={progress['train_rows']} test={progress['test_rows']}"
+            )
+
+    metrics = rolling_backtest(
+        dataset,
+        min_train_fights=min_train_fights,
+        step=step,
+        progress_callback=print_backtest_progress,
+    )
     path = save_backtest_result(metrics, output)
     _print(f"Wrote backtest metrics to {path}")
-    _print_json(metrics)
+    _print_json(_metrics_for_console(metrics))
 
 
 @app.command("predict")

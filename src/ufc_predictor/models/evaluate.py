@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 import pandas as pd
@@ -119,8 +119,9 @@ def save_backtest_result(metrics: dict[str, Any], path: str | Path | None = None
 def rolling_backtest(
     dataset: pd.DataFrame,
     min_train_fights: int = 50,
-    step: str = "MS",
+    step: str = "YS",
     model_dir: str | Path | None = None,
+    progress_callback: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
     """Train on fights before each period and predict the next period."""
 
@@ -131,19 +132,64 @@ def rolling_backtest(
     frame = dataset.sort_values("fight_date").copy()
     frame["fight_date"] = pd.to_datetime(frame["fight_date"], errors="coerce")
     periods = pd.date_range(frame["fight_date"].min(), frame["fight_date"].max(), freq=step)
+    period_pairs = list(zip(periods[:-1], periods[1:]))
     rows = []
-    for start, end in zip(periods[:-1], periods[1:]):
+    skipped_periods = 0
+    for index, (start, end) in enumerate(period_pairs, start=1):
         train = frame[frame["fight_date"] < start]
         test = frame[(frame["fight_date"] >= start) & (frame["fight_date"] < end)]
         if len(train) < min_train_fights or test.empty or train["fighter_a_win"].nunique() < 2:
+            skipped_periods += 1
+            if progress_callback is not None:
+                progress_callback(
+                    {
+                        "period_index": index,
+                        "total_periods": len(period_pairs),
+                        "start": start,
+                        "end": end,
+                        "status": "skipped",
+                        "train_rows": len(train),
+                        "test_rows": len(test),
+                    }
+                )
             continue
-        bundle = train_ensemble(train, model_dir=model_dir, save=False)
+        if progress_callback is not None:
+            progress_callback(
+                {
+                    "period_index": index,
+                    "total_periods": len(period_pairs),
+                    "start": start,
+                    "end": end,
+                    "status": "training",
+                    "train_rows": len(train),
+                    "test_rows": len(test),
+                }
+            )
+        bundle = train_ensemble(train, model_dir=model_dir, save=False, test_fraction=0.0)
         probs = bundle.predict_proba(test[bundle.feature_columns])[:, 1]
         for (_, item), prob in zip(test.iterrows(), probs):
             rows.append({"fight_id": item.get("fight_id"), "fight_date": item["fight_date"], "target": item["fighter_a_win"], "prob": prob})
+        if progress_callback is not None:
+            progress_callback(
+                {
+                    "period_index": index,
+                    "total_periods": len(period_pairs),
+                    "start": start,
+                    "end": end,
+                    "status": "predicted",
+                    "train_rows": len(train),
+                    "test_rows": len(test),
+                }
+            )
     if not rows:
         return {"message": "Not enough chronological data for rolling backtest.", "predictions": []}
     predictions = pd.DataFrame(rows)
     metrics = evaluate_predictions(predictions["target"], predictions["prob"], metadata=predictions)
     metrics["predictions"] = predictions.to_dict(orient="records")
+    metrics["backtest_summary"] = {
+        "step": step,
+        "periods": len(period_pairs),
+        "skipped_periods": skipped_periods,
+        "prediction_rows": len(predictions),
+    }
     return metrics

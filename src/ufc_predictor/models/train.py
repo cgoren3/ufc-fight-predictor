@@ -18,12 +18,32 @@ from ufc_predictor.models.evaluate import baseline_metrics, evaluate_predictions
 
 
 @dataclass
+class FeatureSelectionSummary:
+    total_features_before_cleaning: int
+    dropped_all_null_features: list[str]
+    numeric_features: list[str]
+    categorical_features: list[str]
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "total_features_before_cleaning": self.total_features_before_cleaning,
+            "dropped_all_null_features": self.dropped_all_null_features,
+            "numeric_features": self.numeric_features,
+            "categorical_features": self.categorical_features,
+            "numeric_feature_count": len(self.numeric_features),
+            "categorical_feature_count": len(self.categorical_features),
+        }
+
+
+@dataclass
 class TrainedModelBundle:
     model_version: str
     estimators: list[Any]
     feature_columns: list[str]
     numeric_features: list[str]
     categorical_features: list[str]
+    dropped_all_null_features: list[str] = field(default_factory=list)
+    feature_summary: dict[str, Any] = field(default_factory=dict)
     metrics: dict[str, Any] = field(default_factory=dict)
     created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
 
@@ -70,10 +90,41 @@ def _imports():
     }
 
 
-def _split_features(frame: pd.DataFrame) -> tuple[list[str], list[str], list[str]]:
+ALWAYS_CATEGORICAL_FEATURES = {"event_location"}
+
+
+def _is_all_null_feature(series: pd.Series) -> bool:
+    if series.empty:
+        return True
+    if is_numeric_dtype(series):
+        return bool(series.isna().all())
+    text = series.dropna().astype(str).str.strip()
+    return text.empty or bool(text.eq("").all())
+
+
+def feature_selection_summary(frame: pd.DataFrame) -> FeatureSelectionSummary:
     columns = feature_columns(frame)
-    numeric = [column for column in columns if is_numeric_dtype(frame[column])]
-    categorical = [column for column in columns if column not in numeric]
+    dropped = [column for column in columns if _is_all_null_feature(frame[column])]
+    kept = [column for column in columns if column not in dropped]
+    numeric = [
+        column
+        for column in kept
+        if is_numeric_dtype(frame[column]) and column not in ALWAYS_CATEGORICAL_FEATURES
+    ]
+    categorical = [column for column in kept if column not in numeric]
+    return FeatureSelectionSummary(
+        total_features_before_cleaning=len(columns),
+        dropped_all_null_features=dropped,
+        numeric_features=numeric,
+        categorical_features=categorical,
+    )
+
+
+def _split_features(frame: pd.DataFrame) -> tuple[list[str], list[str], list[str]]:
+    summary = feature_selection_summary(frame)
+    columns = [*summary.numeric_features, *summary.categorical_features]
+    numeric = summary.numeric_features
+    categorical = summary.categorical_features
     return columns, numeric, categorical
 
 
@@ -166,7 +217,12 @@ def train_ensemble(
     train_frame, test_frame = chronological_split(dataset, test_fraction=test_fraction)
     if train_frame["fighter_a_win"].nunique() < 2:
         raise ValueError("Training data must contain wins and losses for fighter_a.")
-    columns, numeric, categorical = _split_features(train_frame)
+    selection = feature_selection_summary(train_frame)
+    columns = [*selection.numeric_features, *selection.categorical_features]
+    numeric = selection.numeric_features
+    categorical = selection.categorical_features
+    if not columns:
+        raise ValueError("No usable model features remain after dropping all-null columns.")
     x_train = train_frame[columns]
     y_train = train_frame["fighter_a_win"].astype(int)
     estimators = []
@@ -182,8 +238,11 @@ def train_ensemble(
         feature_columns=columns,
         numeric_features=numeric,
         categorical_features=categorical,
+        dropped_all_null_features=selection.dropped_all_null_features,
+        feature_summary=selection.as_dict(),
     )
     metrics: dict[str, Any] = {"baselines": baseline_metrics(dataset)}
+    metrics["feature_summary"] = selection.as_dict()
     if not test_frame.empty and test_frame["fighter_a_win"].nunique() >= 1:
         probabilities = bundle.predict_proba(test_frame[columns])[:, 1]
         metrics.update(evaluate_predictions(test_frame["fighter_a_win"], probabilities, metadata=test_frame))
@@ -205,6 +264,8 @@ def save_model_bundle(bundle: TrainedModelBundle, model_dir: str | Path | None =
         "feature_columns": bundle.feature_columns,
         "numeric_features": bundle.numeric_features,
         "categorical_features": bundle.categorical_features,
+        "dropped_all_null_features": bundle.dropped_all_null_features,
+        "feature_summary": bundle.feature_summary,
         "metrics": bundle.metrics,
     }
     (output_dir / "model_metadata.json").write_text(json.dumps(metadata, indent=2, default=str), encoding="utf-8")
