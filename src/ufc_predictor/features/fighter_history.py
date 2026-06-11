@@ -242,6 +242,8 @@ def _opponent_stats_for_history(
     stats = fight_stats.copy()
     if "fight_id" in stats.columns and "fight_id" in history.columns:
         stats = stats[stats["fight_id"].isin(history["fight_id"])]
+    if "fight_date" not in stats.columns and "fight_id" in stats.columns and "fight_id" in history.columns:
+        stats = stats.merge(history[["fight_id", "fight_date", "fighter_a", "fighter_b"]], on="fight_id", how="left")
     if "fighter" not in stats.columns:
         return pd.DataFrame()
     return stats[stats["fighter"].map(_normal) != _normal(fighter)].copy()

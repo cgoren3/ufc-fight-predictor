@@ -1,0 +1,4 @@
+event,fight_date,fighter_a,fighter_b,judge,round_1_a,round_1_b,round_2_a,round_2_b,round_3_a,round_3_b,round_4_a,round_4_b,round_5_a,round_5_b,total_a,total_b,decision_type
+Offline Import FC 1,2021-01-15,Aiden Wolfe,Bruno Vale,Judge One,10,9,10,9,10,9,,,,,30,27,unanimous
+Offline Import FC 1,2021-01-15,Aiden Wolfe,Bruno Vale,Judge Two,10,9,9,10,10,9,,,,,29,28,unanimous
+Offline Import FC 1,2021-01-15,Aiden Wolfe,Bruno Vale,Judge Three,10,9,10,9,10,9,,,,,30,27,unanimous

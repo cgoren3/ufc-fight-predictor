@@ -6,6 +6,7 @@ from typing import Optional
 import pandas as pd
 
 from ufc_predictor.config import settings
+from ufc_predictor.data_sources import SOURCE_SAMPLE, imports_dir_has_fights, read_source_metadata, summarize_raw_data
 from ufc_predictor.data_io import InputDataError, read_optional_csv, read_required_csv
 
 try:
@@ -51,6 +52,7 @@ else:
 
 
 REQUIRED_FIGHT_COLUMNS = ["fighter_a", "fighter_b", "fight_date", "winner"]
+TINY_DATASET_WARNING_THRESHOLD = 500
 
 
 def _print(message: str) -> None:
@@ -168,6 +170,22 @@ def ingest_ufcstats(
         _print(f"- {name}: {path}")
 
 
+@app.command("import-csv")
+def import_csv(
+    import_dir: Path = typer.Option(settings.raw_data_dir / "imports", help="Directory containing real raw CSV imports."),
+    output_dir: Path = typer.Option(settings.raw_data_dir, help="Where normalized raw CSV files should be written."),
+) -> None:
+    from ufc_predictor.ingest.ufcstats_scraper import UFCStatsScraperError, import_raw_csvs
+
+    try:
+        paths = import_raw_csvs(import_dir, output_dir=output_dir)
+    except UFCStatsScraperError as exc:
+        _runtime_error(f"CSV import failed:\n{exc}")
+    _print("Imported real raw CSV files:")
+    for name, path in paths.items():
+        _print(f"- {name}: {path}")
+
+
 @app.command("check-ufcstats")
 def check_ufcstats() -> None:
     from ufc_predictor.ingest.ufcstats_scraper import check_completed_events_page
@@ -176,6 +194,22 @@ def check_ufcstats() -> None:
     _print_fetch_diagnostics(diagnostics)
     if diagnostics.exception_type is not None:
         raise typer.Exit(1)
+
+
+@app.command("data-summary")
+def data_summary(
+    raw_dir: Path = typer.Option(settings.raw_data_dir, help="Raw data directory to summarize."),
+    scorecards_csv: Path = typer.Option(settings.raw_data_dir / "scorecards.csv", help="Optional scorecards CSV path."),
+) -> None:
+    summary = summarize_raw_data(raw_dir=raw_dir, scorecards_path=scorecards_csv)
+    date_range = summary["date_range"]
+    _print(f"Data source: {summary['data_source']}")
+    _print(f"Fights rows: {summary['fights_row_count']}")
+    _print(f"Fighters rows: {summary['fighters_row_count']}")
+    _print(f"Fight stats rows: {summary['fight_stats_row_count']}")
+    _print(f"Scorecards rows: {summary['scorecards_row_count']}")
+    _print(f"Unique fighters: {summary['unique_fighters']}")
+    _print(f"Date range: {date_range['start'] or 'n/a'} to {date_range['end'] or 'n/a'}")
 
 
 @app.command("load-scorecards")
@@ -193,24 +227,43 @@ def build_dataset(
     fights_csv: Path = typer.Option(settings.raw_data_dir / "fights.csv", help="Raw fights CSV."),
     fight_stats_csv: Path = typer.Option(settings.raw_data_dir / "fight_stats.csv", help="Optional fight stats CSV."),
     fighters_csv: Path = typer.Option(settings.raw_data_dir / "fighters.csv", help="Optional fighters CSV."),
-    scorecards_csv: Path = typer.Option(settings.external_data_dir / "scorecards.csv", help="Optional scorecards CSV."),
+    scorecards_csv: Path = typer.Option(settings.raw_data_dir / "scorecards.csv", help="Optional scorecards CSV."),
     output: Path = typer.Option(settings.processed_data_dir / "fight_dataset.parquet", help="Output dataset path."),
     two_way: bool = typer.Option(False, help="Create both fighter orderings for each fight."),
     randomize_order: bool = typer.Option(False, help="Randomize fighter order once per fight."),
     use_sample_data: bool = typer.Option(False, help="Build from the bundled sample/dev dataset."),
+    imports_dir: Path = typer.Option(settings.raw_data_dir / "imports", help="Prefer real CSV imports from this directory when present."),
 ) -> None:
     from ufc_predictor.features.build_fight_dataset import build_fight_dataset, save_dataset
+    from ufc_predictor.ingest.ufcstats_scraper import UFCStatsScraperError, import_raw_csvs
     from ufc_predictor.sample_data import load_sample_data, write_sample_data
 
+    raw_output_dir = fights_csv.parent
     if use_sample_data:
         fights, fighters, fight_stats, scorecards = load_sample_data()
-        write_sample_data(settings.raw_data_dir)
+        write_sample_data(raw_output_dir)
         _print("Using bundled sample/dev data for dataset build.")
     else:
+        if imports_dir_has_fights(imports_dir):
+            try:
+                import_raw_csvs(imports_dir, output_dir=raw_output_dir)
+            except UFCStatsScraperError as exc:
+                _runtime_error(f"CSV import failed before dataset build:\n{exc}")
+            _print(f"Using real CSV imports from {imports_dir}.")
+            fights_csv = raw_output_dir / "fights.csv"
+            fight_stats_csv = raw_output_dir / "fight_stats.csv"
+            fighters_csv = raw_output_dir / "fighters.csv"
+            scorecards_csv = raw_output_dir / "scorecards.csv"
+        source_metadata = read_source_metadata(raw_output_dir)
+        if source_metadata.get("source") == SOURCE_SAMPLE:
+            _runtime_error(
+                "Refusing to build from sample data without --use-sample-data. "
+                "Run `ufc-predict import-csv`, `ufc-predict ingest-ufcstats`, or pass --use-sample-data for development."
+            )
         try:
             fights = read_required_csv(fights_csv, required_columns=REQUIRED_FIGHT_COLUMNS, label="fights CSV")
         except InputDataError as exc:
-            _cli_error(str(exc))
+            _runtime_error(str(exc))
         fight_stats = read_optional_csv(fight_stats_csv, label="fight stats CSV")
         fighters = read_optional_csv(fighters_csv, label="fighters CSV")
         scorecards = read_optional_csv(scorecards_csv, label="scorecards CSV")
@@ -224,6 +277,11 @@ def build_dataset(
     )
     path = save_dataset(dataset, output)
     _print(f"Wrote {len(dataset)} training rows to {path}")
+    if len(dataset) < TINY_DATASET_WARNING_THRESHOLD:
+        _print(
+            f"[yellow]Warning: only {len(dataset)} training rows were built. "
+            f"Model results will be unstable below {TINY_DATASET_WARNING_THRESHOLD} rows.[/yellow]"
+        )
 
 
 @app.command("train")

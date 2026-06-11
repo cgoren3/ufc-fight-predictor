@@ -5,6 +5,7 @@ from pathlib import Path
 import pandas as pd
 
 from ufc_predictor.config import settings
+from ufc_predictor.data_sources import SOURCE_SAMPLE, write_source_metadata
 
 
 SAMPLE_DATA_DIR = settings.project_root / "data" / "sample"
@@ -33,4 +34,5 @@ def write_sample_data(output_dir: str | Path | None = None) -> dict[str, Path]:
     }
     fights.to_csv(paths["fights"], index=False)
     fighters.to_csv(paths["fighters"], index=False)
+    write_source_metadata(SOURCE_SAMPLE, raw_dir=output, details={"note": "Bundled sample/dev data only."})
     return paths

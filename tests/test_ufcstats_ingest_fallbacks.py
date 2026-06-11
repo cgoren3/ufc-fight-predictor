@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pandas as pd
 from typer.testing import CliRunner
 
@@ -8,6 +10,7 @@ from ufc_predictor.ingest.ufcstats_scraper import FetchDiagnostics, UFCStatsScra
 
 
 runner = CliRunner()
+FIXTURE_IMPORTS = Path(__file__).parent / "fixtures" / "imports"
 
 
 class FailingSession:
@@ -138,3 +141,60 @@ def test_csv_import_fallback_writes_real_imports(tmp_path) -> None:
     fights = pd.read_csv(output_dir / "fights.csv")
     assert len(fights) == 1
     assert fights.loc[0, "fighter_b"] == "Imported B"
+
+
+def test_import_csv_command_works(tmp_path) -> None:
+    output_dir = tmp_path / "raw"
+
+    result = runner.invoke(app, ["import-csv", "--import-dir", str(FIXTURE_IMPORTS), "--output-dir", str(output_dir)])
+
+    assert result.exit_code == 0
+    assert "Imported real raw CSV files" in result.output
+    assert (output_dir / "source_metadata.json").exists()
+    fights = pd.read_csv(output_dir / "fights.csv")
+    fight_stats = pd.read_csv(output_dir / "fight_stats.csv")
+    assert len(fights) == 8
+    assert len(fight_stats) == 16
+
+
+def test_data_summary_detects_imported_data(tmp_path) -> None:
+    output_dir = tmp_path / "raw"
+    import_result = runner.invoke(app, ["import-csv", "--import-dir", str(FIXTURE_IMPORTS), "--output-dir", str(output_dir)])
+    assert import_result.exit_code == 0
+
+    result = runner.invoke(app, ["data-summary", "--raw-dir", str(output_dir), "--scorecards-csv", str(output_dir / "scorecards.csv")])
+
+    assert result.exit_code == 0
+    assert "Data source: csv import" in result.output
+    assert "Fights rows: 8" in result.output
+    assert "Fight stats rows: 16" in result.output
+    assert "Unique fighters: 8" in result.output
+
+
+def test_build_dataset_uses_imported_data_and_warns_on_tiny_dataset(tmp_path) -> None:
+    raw_dir = tmp_path / "raw"
+    processed_dir = tmp_path / "processed"
+    result = runner.invoke(
+        app,
+        [
+            "build-dataset",
+            "--imports-dir",
+            str(FIXTURE_IMPORTS),
+            "--fights-csv",
+            str(raw_dir / "fights.csv"),
+            "--fight-stats-csv",
+            str(raw_dir / "fight_stats.csv"),
+            "--fighters-csv",
+            str(raw_dir / "fighters.csv"),
+            "--scorecards-csv",
+            str(raw_dir / "scorecards.csv"),
+            "--output",
+            str(processed_dir / "fight_dataset.parquet"),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Using real CSV imports" in result.output
+    assert "Wrote 8 training rows" in result.output
+    assert "Warning: only 8 training rows" in result.output
+    assert pd.read_csv(raw_dir / "fights.csv").loc[0, "event_name"] == "Offline Import FC 1"

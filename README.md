@@ -100,10 +100,64 @@ This uses the local HTML file to discover event links. Event-detail pages still 
 To import real raw CSV data instead of scraping, place `fights.csv`, and optionally `fighters.csv`, `fight_stats.csv`, and `events.csv`, under `data/raw/imports/`, then run:
 
 ```bash
-ufc-predict ingest-ufcstats --from-csv-imports data/raw/imports
+ufc-predict import-csv
 ```
 
 Imported CSV data is treated as real raw input, not sample data. The bundled sample data is only for development and is clearly labeled in command output.
+
+To summarize the active raw data:
+
+```bash
+ufc-predict data-summary
+```
+
+The summary prints row counts for fights, fighters, fight stats, scorecards, unique fighters, fight-date range, and whether the active data source is `live scrape`, `csv import`, `manual html`, `sample`, or `unknown`.
+
+## Offline CSV Import Schema
+
+Codespaces may not be able to connect to UFCStats reliably. The recommended real-data path is to export/download historical data as CSV files under `data/raw/imports/`, then run:
+
+```bash
+ufc-predict import-csv
+ufc-predict data-summary
+ufc-predict build-dataset
+```
+
+Required: `data/raw/imports/fights.csv`
+
+```text
+fight_id,event_id,event_name,fight_date,event_location,
+fighter_a,fighter_b,winner,method,finish_round,finish_time,
+weight_class,scheduled_rounds,main_event,title_fight,
+catchweight,missed_weight,short_notice_replacement,source_url
+```
+
+Minimum required columns are `fighter_a`, `fighter_b`, `fight_date`, and `winner`. Missing optional columns are created as blanks during import.
+
+Recommended: `data/raw/imports/fighters.csv`
+
+```text
+name,stance,height_in,weight_lb,reach_in,date_of_birth,country,state,source_url
+```
+
+Recommended: `data/raw/imports/fight_stats.csv`
+
+```text
+fight_id,fighter,opponent,knockdowns,
+sig_str_landed,sig_str_attempted,total_str_landed,total_str_attempted,
+takedowns_landed,takedowns_attempted,submission_attempts,reversals,
+control_seconds,head_landed,body_landed,leg_landed
+```
+
+Optional: `data/raw/imports/scorecards.csv`
+
+```text
+event,fight_date,fighter_a,fighter_b,judge,
+round_1_a,round_1_b,round_2_a,round_2_b,round_3_a,round_3_b,
+round_4_a,round_4_b,round_5_a,round_5_b,total_a,total_b,decision_type
+```
+
+`build-dataset` automatically imports `data/raw/imports/fights.csv` when present. It refuses to build from bundled sample data unless `--use-sample-data` is passed, and it warns when fewer than 500 training rows are produced.
 
 ## Manual Data
 

@@ -10,6 +10,7 @@ from typing import Any
 import pandas as pd
 
 from ufc_predictor.config import settings
+from ufc_predictor.data_sources import SOURCE_CSV_IMPORT, SOURCE_LIVE_SCRAPE, SOURCE_MANUAL_HTML, write_source_metadata
 from ufc_predictor.data_io import InputDataError, inspect_csv
 
 
@@ -541,6 +542,11 @@ class UFCStatsScraper:
             paths["fighters"] = output / "fighters.csv"
             pd.DataFrame(fight_stats_rows, columns=FIGHT_STAT_COLUMNS).to_csv(paths["fight_stats"], index=False)
             pd.DataFrame(fighter_rows.values(), columns=FIGHTER_COLUMNS).to_csv(paths["fighters"], index=False)
+        write_source_metadata(
+            SOURCE_MANUAL_HTML if from_html else SOURCE_LIVE_SCRAPE,
+            raw_dir=output,
+            details={"from_html": str(from_html) if from_html else None, "include_details": include_details},
+        )
         return paths
 
 
@@ -568,6 +574,7 @@ def import_raw_csvs(
         ("fighters", FIGHTER_COLUMNS),
         ("fight_stats", FIGHT_STAT_COLUMNS),
         ("events", EVENT_COLUMNS),
+        ("scorecards", None),
     ]:
         source_file = source / f"{name}.csv"
         if not source_file.exists():
@@ -578,6 +585,8 @@ def import_raw_csvs(
                 if column not in frame.columns:
                     frame[column] = ""
             frame = frame[FIGHT_COLUMNS]
+        elif columns is None:
+            frame = frame.copy()
         else:
             frame = frame.reindex(columns=columns)
         destination = output / f"{name}.csv"
@@ -585,4 +594,5 @@ def import_raw_csvs(
         paths[name] = destination
     if "fights" not in paths:
         raise UFCStatsScraperError(f"CSV import did not write fights.csv from {source}")
+    write_source_metadata(SOURCE_CSV_IMPORT, raw_dir=output, details={"import_dir": str(source)})
     return paths
