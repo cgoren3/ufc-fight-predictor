@@ -157,6 +157,30 @@ def test_import_csv_command_works(tmp_path) -> None:
     assert len(fight_stats) == 16
 
 
+def test_import_csv_removes_stale_optional_scorecards(tmp_path) -> None:
+    import_dir = tmp_path / "imports"
+    output_dir = tmp_path / "raw"
+    import_dir.mkdir()
+    output_dir.mkdir()
+    (output_dir / "scorecards.csv").write_text(
+        "event,fight_date,fighter_a,fighter_b,judge,round_1_a,round_1_b,round_2_a,round_2_b,round_3_a,round_3_b,round_4_a,round_4_b,round_5_a,round_5_b,total_a,total_b,decision_type\n"
+        "Old Event,2020-01-01,A,B,Judge,10,9,10,9,10,9,,,,,30,27,Unanimous\n",
+        encoding="utf-8",
+    )
+    (import_dir / "fights.csv").write_text(
+        "fight_id,fight_date,fighter_a,fighter_b,winner\n"
+        "1,2024-01-01,A,B,A\n",
+        encoding="utf-8",
+    )
+    (import_dir / "fighters.csv").write_text("name\nA\nB\n", encoding="utf-8")
+    (import_dir / "fight_stats.csv").write_text("fight_id,fighter,opponent\n1,A,B\n1,B,A\n", encoding="utf-8")
+
+    result = runner.invoke(app, ["import-csv", "--import-dir", str(import_dir), "--output-dir", str(output_dir)])
+
+    assert result.exit_code == 0
+    assert not (output_dir / "scorecards.csv").exists()
+
+
 def test_data_summary_detects_imported_data(tmp_path) -> None:
     output_dir = tmp_path / "raw"
     import_result = runner.invoke(app, ["import-csv", "--import-dir", str(FIXTURE_IMPORTS), "--output-dir", str(output_dir)])

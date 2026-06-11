@@ -1,17 +1,5 @@
-fight_id,fighter,opponent,knockdowns,sig_str_landed,sig_str_attempted,total_str_landed,total_str_attempted,takedowns_landed,takedowns_attempted,submission_attempts,reversals,control_seconds,head_landed,body_landed,leg_landed
-1,Aiden Wolfe,Bruno Vale,0,42,90,70,128,1,3,0,0,120,25,10,7
-1,Bruno Vale,Aiden Wolfe,0,35,88,58,119,0,1,0,0,45,20,8,7
-2,Casey North,Darius King,0,18,47,30,65,2,5,1,0,210,12,4,2
-2,Darius King,Casey North,1,28,55,40,76,0,0,0,0,15,20,5,3
-3,Elias Stone,Felix Cruz,0,12,31,20,44,1,1,2,0,180,7,3,2
-3,Felix Cruz,Elias Stone,0,10,29,17,41,0,2,0,0,30,6,2,2
-4,Gavin Holt,Mateo Silva,0,36,92,55,130,2,6,0,1,240,22,8,6
-4,Mateo Silva,Gavin Holt,0,39,84,60,124,1,2,1,0,130,24,9,6
-5,Bruno Vale,Felix Cruz,1,24,52,36,73,0,0,0,0,10,18,4,2
-5,Felix Cruz,Bruno Vale,0,15,45,24,66,1,2,0,0,70,9,3,3
-6,Aiden Wolfe,Darius King,0,50,110,78,150,2,4,0,0,185,31,11,8
-6,Darius King,Aiden Wolfe,0,44,105,70,142,0,1,0,0,25,28,9,7
-7,Casey North,Mateo Silva,0,22,58,38,82,3,7,2,0,260,14,5,3
-7,Mateo Silva,Casey North,0,20,62,35,88,0,1,0,0,35,13,4,3
-8,Elias Stone,Gavin Holt,0,34,85,51,118,1,3,1,0,95,20,8,6
-8,Gavin Holt,Elias Stone,0,41,90,63,125,2,4,0,0,190,27,9,5
+fight_id,source_url,fighter,opponent,knockdowns,sig_str_landed,sig_str_attempted,total_str_landed,total_str_attempted,takedowns_landed,takedowns_attempted,submission_attempts,reversals,control_seconds,head_landed,body_landed,leg_landed
+1,,Red One,Blue One,,12.0,30.0,25.0,50.0,2.0,5.0,1,0,195.0,,,
+1,,Blue One,Red One,,10.0,28.0,19.0,44.0,1.0,3.0,0,1,62.0,,,
+2,,Red Two,Blue Two,,20.0,42.0,32.0,61.0,0.0,2.0,0,0,45.0,,,
+2,,Blue Two,Red Two,,24.0,40.0,35.0,58.0,3.0,6.0,1,0,260.0,,,

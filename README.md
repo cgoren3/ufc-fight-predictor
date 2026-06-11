@@ -170,6 +170,25 @@ Full schema files live in:
 
 Additional import guidance lives in `docs/import_data.md`.
 
+## Adapt Kaggle or Third-Party CSV Data
+
+If you download a UFC dataset from Kaggle or another source, unzip it under `data/raw/downloads/` and inspect the columns first:
+
+```bash
+ufc-predict dataset-columns --source data/raw/downloads/kaggle_ufc_dataset
+```
+
+Then adapt common UFC/Kaggle column names into the required import schema:
+
+```bash
+ufc-predict adapt-dataset --source data/raw/downloads/kaggle_ufc_dataset
+ufc-predict validate-imports
+ufc-predict import-csv
+ufc-predict data-summary
+```
+
+The adapter writes real import files under `data/raw/imports/`; it does not treat adapted data as sample data. It is conservative: if required fight/date/winner columns cannot be mapped confidently, it prints a clear error instead of guessing. Full guidance is in `docs/kaggle_import.md`.
+
 ## Manual Data
 
 Official scorecards can be imported from CSV with these columns:

@@ -569,6 +569,9 @@ def import_raw_csvs(
     except InputDataError as exc:
         raise UFCStatsScraperError(str(exc)) from exc
     paths: dict[str, Path] = {}
+    if source.resolve() != output.resolve():
+        for filename in ["fights.csv", "fighters.csv", "fight_stats.csv", "events.csv", "scorecards.csv"]:
+            (output / filename).unlink(missing_ok=True)
     for name, columns in [
         ("fights", FIGHT_COLUMNS),
         ("fighters", FIGHTER_COLUMNS),

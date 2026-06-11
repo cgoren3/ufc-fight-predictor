@@ -1,0 +1,3 @@
+event,date,location,R_fighter,B_fighter,Winner,weight_class,method,round,time,no_of_rounds,R_Stance,B_Stance,R_Height_cms,B_Height_cms,R_Reach_cms,B_Reach_cms,R_DOB,B_DOB,R_SIG_STR.,B_SIG_STR.,R_TOTAL_STR.,B_TOTAL_STR.,R_TD,B_TD,R_SUB_ATT,B_SUB_ATT,R_REV,B_REV,R_CTRL,B_CTRL
+UFC Fixture 1,2020-01-01,"Las Vegas, Nevada, USA",Red One,Blue One,Red,Lightweight,Decision - Unanimous,3,5:00,3,Orthodox,Southpaw,178,180,183,185,1990-01-01,1991-02-02,12 of 30,10 of 28,25 of 50,19 of 44,2 of 5,1 of 3,1,0,0,1,3:15,1:02
+UFC Fixture 2,2020-02-15,"New York, New York, USA",Red Two,Blue Two,Blue Two,Welterweight,KO/TKO,2,2:34,3,Switch,Orthodox,175,182,180,188,1988-03-03,1989-04-04,20 of 42,24 of 40,32 of 61,35 of 58,0 of 2,3 of 6,0,1,0,0,0:45,4:20

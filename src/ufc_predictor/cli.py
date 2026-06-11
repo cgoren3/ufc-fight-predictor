@@ -8,6 +8,7 @@ import pandas as pd
 from ufc_predictor.config import settings
 from ufc_predictor.data_sources import SOURCE_SAMPLE, imports_dir_has_fights, read_source_metadata, summarize_raw_data
 from ufc_predictor.data_io import InputDataError, read_optional_csv, read_required_csv
+from ufc_predictor.dataset_adapter import DatasetAdapterError
 from ufc_predictor.import_validation import MIN_MEANINGFUL_FIGHTS, MIN_RELIABLE_BACKTEST_FIGHTS
 
 try:
@@ -185,6 +186,48 @@ def import_csv(
     _print("Imported real raw CSV files:")
     for name, path in paths.items():
         _print(f"- {name}: {path}")
+
+
+@app.command("dataset-columns")
+def dataset_columns(
+    source: Path = typer.Option(..., "--source", help="Folder containing downloaded Kaggle/third-party UFC CSV files."),
+) -> None:
+    from ufc_predictor.dataset_adapter import list_csv_columns
+
+    try:
+        infos = list_csv_columns(source)
+    except DatasetAdapterError as exc:
+        _runtime_error(str(exc))
+    _print(f"CSV columns under {source}:")
+    for info in infos:
+        _print(f"- {info.path}:")
+        _print("  " + ", ".join(info.columns))
+
+
+@app.command("adapt-dataset")
+def adapt_dataset(
+    source: Path = typer.Option(..., "--source", help="Folder containing downloaded Kaggle/third-party UFC CSV files."),
+    output_dir: Path = typer.Option(settings.raw_data_dir / "imports", "--output-dir", help="Where adapted import CSVs should be written."),
+) -> None:
+    from ufc_predictor.dataset_adapter import adapt_dataset as adapt_external_dataset
+
+    try:
+        result = adapt_external_dataset(source, output_dir)
+    except DatasetAdapterError as exc:
+        _runtime_error(f"Dataset adaptation failed:\n{exc}")
+
+    if result.copied_existing_schema:
+        _print("Source already matched the import schema; copied CSV files directly.")
+    else:
+        _print("Adapted external UFC CSV dataset into project import schema.")
+    _print(f"Output directory: {result.output_dir}")
+    for name, path in result.files.items():
+        source_file = result.source_files.get(name)
+        suffix = f" from {source_file}" if source_file else ""
+        _print(f"- {name}: {path}{suffix}")
+    for warning in result.warnings:
+        _print(f"[yellow]Warning: {warning}[/yellow]")
+    _print("Next steps: ufc-predict validate-imports && ufc-predict import-csv && ufc-predict data-summary")
 
 
 @app.command("validate-imports")

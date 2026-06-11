@@ -1,9 +1,5 @@
 name,stance,height_in,weight_lb,reach_in,date_of_birth,record,source_url
-Aiden Wolfe,Orthodox,70,155,72,1994-04-12,,
-Bruno Vale,Southpaw,69,155,71,1992-09-03,,
-Casey North,Switch,71,170,74,1990-02-20,,
-Darius King,Orthodox,72,170,75,1989-11-18,,
-Elias Stone,Southpaw,68,145,70,1996-06-02,,
-Felix Cruz,Orthodox,67,145,69,1995-01-29,,
-Gavin Holt,Switch,73,185,76,1991-07-08,,
-Mateo Silva,Southpaw,72,185,77,1993-12-14,,
+Blue One,Southpaw,180.0,,185.0,1991-02-02,,
+Blue Two,Orthodox,182.0,,188.0,1989-04-04,,
+Red One,Orthodox,178.0,,183.0,1990-01-01,,
+Red Two,Switch,175.0,,180.0,1988-03-03,,
