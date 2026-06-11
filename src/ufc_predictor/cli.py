@@ -214,7 +214,18 @@ def adapt_dataset(
     try:
         result = adapt_external_dataset(source, output_dir)
     except DatasetAdapterError as exc:
-        _runtime_error(f"Dataset adaptation failed:\n{exc}")
+        existing = [
+            str(output_dir / name)
+            for name in ["fights.csv", "fighters.csv", "fight_stats.csv", "scorecards.csv"]
+            if (output_dir / name).exists()
+        ]
+        message = f"Dataset adaptation failed:\n{exc}"
+        if existing:
+            message += (
+                "\nExisting import files still exist and were not overwritten because adaptation failed: "
+                + ", ".join(existing)
+            )
+        _runtime_error(message)
 
     if result.copied_existing_schema:
         _print("Source already matched the import schema; copied CSV files directly.")

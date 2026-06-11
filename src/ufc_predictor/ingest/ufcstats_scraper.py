@@ -60,6 +60,7 @@ FIGHT_COLUMNS = [
     "finish_round",
     "finish_time",
     "scheduled_rounds",
+    "main_event",
     "source_url",
 ]
 FIGHT_STAT_COLUMNS = [
@@ -590,6 +591,12 @@ def import_raw_csvs(
             frame = frame[FIGHT_COLUMNS]
         elif columns is None:
             frame = frame.copy()
+        elif name == "fight_stats":
+            for column in columns:
+                if column not in frame.columns:
+                    frame[column] = ""
+            extra_columns = [column for column in frame.columns if column not in columns]
+            frame = frame[[*columns, *extra_columns]]
         else:
             frame = frame.reindex(columns=columns)
         destination = output / f"{name}.csv"

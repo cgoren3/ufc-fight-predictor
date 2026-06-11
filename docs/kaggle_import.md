@@ -2,6 +2,16 @@
 
 Many UFC datasets on Kaggle use their own column names, such as `R_fighter`, `B_fighter`, `Winner`, `R_SIG_STR.`, and `B_TD`. The adapter converts common fight-level CSV layouts into this project's import schema.
 
+It also supports long-format fighter-performance files where each row is one fighter in one fight, such as:
+
+```text
+fight_fighter,opponent,fight_result,kd,str,td,sub,event,event_date,method,round,time
+```
+
+For that layout, mirrored rows are deduplicated into one `fights.csv` row per actual fight, while `fight_stats.csv` keeps one row per fighter performance.
+
+Rows with missing or unparseable `event_date` are skipped with a warning because this project cannot build leakage-safe chronological features from undated fights.
+
 ## 1. Download Manually
 
 Download the dataset from Kaggle or another provider using your browser or their CLI, then unzip it under:
@@ -79,5 +89,6 @@ The adapter maps obvious aliases only. It supports common names including:
 - `weight_class`, `method`, `round`, `time`, `no_of_rounds`
 - `stance`, `height`, `reach`, `dob`, `date_of_birth`
 - `SIG_STR`, `TOTAL_STR`, `TD`, `SUB_ATT`, `REV`, `CTRL` with `R_`/`B_`, `red_`/`blue_`, or direct per-fighter columns
+- Long-format columns: `fight_fighter`, `opponent`, `fight_result`, `kd`, `str`, `td`, `sub`, `event`, `event_date`, `method`, `round`, `time`
 
 If the adapter cannot confidently identify the fight-level file or required fighter/date/winner columns, it exits with a clear error. Rename columns or provide normalized CSV files under `data/raw/imports/` when a dataset uses unusual naming.

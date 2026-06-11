@@ -189,6 +189,8 @@ ufc-predict data-summary
 
 The adapter writes real import files under `data/raw/imports/`; it does not treat adapted data as sample data. It is conservative: if required fight/date/winner columns cannot be mapped confidently, it prints a clear error instead of guessing. Full guidance is in `docs/kaggle_import.md`.
 
+The adapter also supports long-format fighter-performance CSVs with columns such as `fight_fighter`, `opponent`, `fight_result`, `kd`, `str`, `td`, `sub`, `event`, `event_date`, `method`, `round`, and `time`.
+
 ## Manual Data
 
 Official scorecards can be imported from CSV with these columns:

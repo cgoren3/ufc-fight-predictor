@@ -85,6 +85,22 @@ STAT_ALIASES = {
     "leg_landed": ["leg_landed", "leg_strikes_landed", "leg"],
 }
 
+LONG_FORMAT_ALIASES = {
+    "fighter": ["fight_fighter"],
+    "opponent": ["opponent"],
+    "result": ["fight_result"],
+    "event": ["event"],
+    "event_date": ["event_date"],
+    "method": ["method"],
+    "round": ["round"],
+    "time": ["time"],
+    "kd": ["kd"],
+    "str": ["str"],
+    "td": ["td"],
+    "sub": ["sub"],
+}
+LONG_FORMAT_RAW_STAT_COLUMNS = ["raw_kd", "raw_str", "raw_td", "raw_sub"]
+
 
 def normalize_column(value: Any) -> str:
     text = str(value or "").strip().lower()
@@ -231,6 +247,24 @@ def _has_pair_fight_columns(info: CsvColumnInfo) -> bool:
     )
 
 
+def _has_long_format_columns(info: CsvColumnInfo) -> bool:
+    columns = info.columns
+    return all(
+        _find_column(columns, aliases, label, required=False) is not None
+        for label, aliases in LONG_FORMAT_ALIASES.items()
+    )
+
+
+def _select_long_format_file(infos: list[CsvColumnInfo]) -> CsvColumnInfo | None:
+    candidates = [info for info in infos if _has_long_format_columns(info)]
+    if not candidates:
+        return None
+    if len(candidates) > 1:
+        names = ", ".join(str(info.path) for info in candidates)
+        raise DatasetAdapterError(f"Multiple long-format fighter-performance CSV candidates were found: {names}")
+    return candidates[0]
+
+
 def _select_fight_file(infos: list[CsvColumnInfo]) -> CsvColumnInfo:
     candidates = [info for info in infos if _has_pair_fight_columns(info)]
     if not candidates:
@@ -248,12 +282,19 @@ def _select_fight_file(infos: list[CsvColumnInfo]) -> CsvColumnInfo:
     return candidates[0]
 
 
+def _parse_date_value(value: Any) -> Any:
+    if not _clean(value):
+        return pd.NaT
+    return pd.to_datetime(value, errors="coerce")
+
+
 def _date_series(frame: pd.DataFrame, column: str, path: Path) -> pd.Series:
-    dates = pd.to_datetime(frame[column], errors="coerce")
-    bad = frame.loc[dates.isna(), column].head(5).tolist()
+    dates = frame[column].map(_parse_date_value)
+    bad_values = frame.loc[dates.isna(), column].map(_clean).replace("", "<blank>").head(5).tolist()
+    bad = [value for value in bad_values if value]
     if bad:
         raise DatasetAdapterError(f"Could not parse fight dates in {path}. Bad examples: {bad}")
-    return dates.dt.date.astype(str)
+    return pd.to_datetime(dates).dt.date.astype(str)
 
 
 def _numeric_or_blank(value: Any) -> Any:
@@ -459,6 +500,213 @@ def _parse_landed_attempted(value: Any) -> tuple[Any, Any]:
     if not match:
         return "", ""
     return float(match.group(1)), float(match.group(2))
+
+
+def _parse_long_stat(value: Any) -> tuple[Any, Any, str]:
+    raw = _clean(value)
+    if not raw:
+        return "", "", ""
+
+    landed, attempted = _parse_landed_attempted(raw)
+    if landed != "":
+        return landed, attempted, raw
+
+    numeric = pd.to_numeric(pd.Series([raw]), errors="coerce").iloc[0]
+    if pd.notna(numeric):
+        return numeric, "", raw
+
+    tokens = re.findall(r"[-+]?\d*\.?\d+", raw)
+    if tokens:
+        return float(tokens[0]), "", raw
+    return "", "", raw
+
+
+def _long_result_winner(fighter: str, opponent: str, result: Any) -> tuple[str, bool]:
+    text = _clean(result).lower()
+    if text in {"win", "w", "won"}:
+        return fighter, True
+    if text in {"loss", "l", "lost", "lose"}:
+        return opponent, True
+    if text in {"", "draw", "d", "nc", "no contest", "no-contest", "unknown", "unk"}:
+        return "", True
+    return "", False
+
+
+def _long_fight_key(row: pd.Series, columns: dict[str, str], fight_date: str) -> tuple[str, str, tuple[str, str], str, str, str]:
+    fighter = _clean(row.get(columns["fighter"])).lower()
+    opponent = _clean(row.get(columns["opponent"])).lower()
+    return (
+        _clean(row.get(columns["event"])).lower(),
+        fight_date,
+        tuple(sorted([fighter, opponent])),
+        _clean(row.get(columns["method"])).lower(),
+        _clean(row.get(columns["round"])).lower(),
+        _clean(row.get(columns["time"])).lower(),
+    )
+
+
+def _long_stats_row(row: pd.Series, columns: dict[str, str], fight_id: int) -> dict[str, Any]:
+    kd_value, _, raw_kd = _parse_long_stat(row.get(columns["kd"]))
+    str_landed, str_attempted, raw_str = _parse_long_stat(row.get(columns["str"]))
+    td_landed, td_attempted, raw_td = _parse_long_stat(row.get(columns["td"]))
+    sub_attempts, _, raw_sub = _parse_long_stat(row.get(columns["sub"]))
+    return {
+        "fight_id": fight_id,
+        "source_url": "",
+        "fighter": _clean(row.get(columns["fighter"])),
+        "opponent": _clean(row.get(columns["opponent"])),
+        "knockdowns": kd_value,
+        "sig_str_landed": str_landed,
+        "sig_str_attempted": str_attempted,
+        "total_str_landed": "",
+        "total_str_attempted": "",
+        "takedowns_landed": td_landed,
+        "takedowns_attempted": td_attempted,
+        "submission_attempts": sub_attempts,
+        "reversals": "",
+        "control_seconds": "",
+        "head_landed": "",
+        "body_landed": "",
+        "leg_landed": "",
+        "raw_kd": raw_kd,
+        "raw_str": raw_str,
+        "raw_td": raw_td,
+        "raw_sub": raw_sub,
+    }
+
+
+def _fighters_from_long_rows(frame: pd.DataFrame, fighter_col: str, opponent_col: str) -> pd.DataFrame:
+    names: dict[str, str] = {}
+    for _, row in frame.iterrows():
+        for column in [fighter_col, opponent_col]:
+            name = _clean(row.get(column))
+            if name and name.lower() not in names:
+                names[name.lower()] = name
+    rows = [
+        {
+            "name": name,
+            "stance": "",
+            "height_in": "",
+            "weight_lb": "",
+            "reach_in": "",
+            "date_of_birth": "",
+            "record": "",
+            "source_url": "",
+        }
+        for name in names.values()
+    ]
+    return pd.DataFrame(rows).reindex(columns=FIGHTER_COLUMNS)
+
+
+def _adapt_long_format_dataset(info: CsvColumnInfo, output_path: Path) -> AdaptDatasetResult:
+    frame = _read_frame(info.path)
+    columns = {
+        label: _find_column(frame.columns, aliases, label, required=True, context=str(info.path))
+        for label, aliases in LONG_FORMAT_ALIASES.items()
+    }
+    parsed_dates = frame[columns["event_date"]].map(_parse_date_value)
+    valid_date_mask = parsed_dates.notna()
+    dropped_missing_dates = int((~valid_date_mask).sum())
+    frame = frame.loc[valid_date_mask].reset_index(drop=True)
+    dates = pd.to_datetime(parsed_dates.loc[valid_date_mask]).dt.date.astype(str).reset_index(drop=True)
+    if frame.empty:
+        raise DatasetAdapterError(
+            f"{info.path} has long-format columns, but no rows have a parseable event_date. "
+            "A leakage-safe dataset requires dated fights."
+        )
+
+    fights_by_key: dict[tuple[str, str, tuple[str, str], str, str, str], dict[str, Any]] = {}
+    fight_ids_by_key: dict[tuple[str, str, tuple[str, str], str, str, str], int] = {}
+    stats_rows: list[dict[str, Any]] = []
+    stats_seen: set[tuple[int, str]] = set()
+    duplicate_stats = 0
+    unknown_results = 0
+
+    for index, row in frame.iterrows():
+        fighter = _clean(row.get(columns["fighter"]))
+        opponent = _clean(row.get(columns["opponent"]))
+        if not fighter or not opponent:
+            raise DatasetAdapterError(f"Missing fighter or opponent name in {info.path} row {index + 2}.")
+        fight_date = dates.iloc[index]
+        key = _long_fight_key(row, columns, fight_date)
+        winner, recognized_result = _long_result_winner(fighter, opponent, row.get(columns["result"]))
+        if not recognized_result:
+            unknown_results += 1
+
+        if key not in fight_ids_by_key:
+            fight_id = len(fight_ids_by_key) + 1
+            fight_ids_by_key[key] = fight_id
+            fights_by_key[key] = {
+                "fight_id": fight_id,
+                "event_name": _clean(row.get(columns["event"])),
+                "fight_date": fight_date,
+                "event_location": "",
+                "fighter_a": fighter,
+                "fighter_b": opponent,
+                "winner": winner,
+                "weight_class": "Unknown",
+                "method": _clean(row.get(columns["method"])),
+                "finish_round": _clean(row.get(columns["round"])),
+                "finish_time": _clean(row.get(columns["time"])),
+                "scheduled_rounds": 3,
+                "main_event": 0,
+                "source_url": "",
+            }
+        else:
+            fight_id = fight_ids_by_key[key]
+            existing_winner = _clean(fights_by_key[key].get("winner"))
+            if winner and not existing_winner:
+                fights_by_key[key]["winner"] = winner
+            elif winner and existing_winner and winner.lower() != existing_winner.lower():
+                raise DatasetAdapterError(
+                    "Conflicting mirrored fight_result values for "
+                    f"{fighter} vs {opponent} at {fights_by_key[key]['event_name']} on {fight_date}."
+                )
+
+        stats_key = (fight_id, fighter.lower())
+        if stats_key in stats_seen:
+            duplicate_stats += 1
+            continue
+        stats_seen.add(stats_key)
+        stats_rows.append(_long_stats_row(row, columns, fight_id))
+
+    fights = pd.DataFrame(fights_by_key.values())
+    for column in FIGHT_COLUMNS:
+        if column not in fights.columns:
+            fights[column] = ""
+    fighters = _fighters_from_long_rows(frame, columns["fighter"], columns["opponent"])
+    fight_stats_columns = [*FIGHT_STAT_COLUMNS, *LONG_FORMAT_RAW_STAT_COLUMNS]
+    fight_stats = pd.DataFrame(stats_rows).reindex(columns=fight_stats_columns)
+
+    output_path.mkdir(parents=True, exist_ok=True)
+    if info.path.parent.resolve() != output_path.resolve():
+        _clear_known_outputs(output_path)
+    files = {
+        "fights": output_path / "fights.csv",
+        "fighters": output_path / "fighters.csv",
+        "fight_stats": output_path / "fight_stats.csv",
+    }
+    fights[FIGHT_COLUMNS].to_csv(files["fights"], index=False)
+    fighters.to_csv(files["fighters"], index=False)
+    fight_stats.to_csv(files["fight_stats"], index=False)
+
+    result = AdaptDatasetResult(output_dir=output_path, files=files, source_files={"fights": info.path, "fight_stats": info.path})
+    result.source_files["fighters"] = info.path
+    result.warnings.append(
+        "Detected long-format fighter-performance CSV; deduplicated mirrored rows into one fights.csv row per fight."
+    )
+    if dropped_missing_dates:
+        result.warnings.append(
+            f"Dropped {dropped_missing_dates} rows with missing or unparseable event_date; "
+            "undated fights cannot be used for leakage-safe training."
+        )
+    if unknown_results:
+        result.warnings.append(
+            f"{unknown_results} fight_result values were not win/loss/draw/no contest; winner was left blank for those rows."
+        )
+    if duplicate_stats:
+        result.warnings.append(f"Skipped {duplicate_stats} duplicate fighter stats rows after fight deduplication.")
+    return result
 
 
 def _time_to_seconds(value: Any) -> Any:
@@ -688,6 +936,10 @@ def adapt_dataset(source: str | Path, output_dir: str | Path) -> AdaptDatasetRes
         return copied
 
     infos = list_csv_columns(source_path)
+    long_info = _select_long_format_file(infos)
+    if long_info is not None:
+        return _adapt_long_format_dataset(long_info, output_path)
+
     fight_info = _select_fight_file(infos)
     mapping = _adapt_fights(fight_info)
     result = AdaptDatasetResult(output_dir=output_path, source_files={"fights": fight_info.path})

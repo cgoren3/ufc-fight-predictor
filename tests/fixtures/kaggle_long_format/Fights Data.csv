@@ -1,0 +1,5 @@
+fight_fighter,opponent,fight_result,kd,str,td,sub,event,event_date,method,round,time
+Alice Alpha,Beth Beta,win,1 0,12 of 30,2 0,1 0,UFC Long Fixture,"Jan. 1, 2020",U-DEC,3,5:00
+Beth Beta,Alice Alpha,loss,0 1,8 of 22,0 2,0 1,UFC Long Fixture,"Jan. 1, 2020",U-DEC,3,5:00
+Cara Delta,Dina Echo,draw,not available,bad,1 of 3,??,UFC Long Fixture 2,"Feb. 2, 2020",DRAW,3,5:00
+Dina Echo,Cara Delta,draw,0,10,2,0,UFC Long Fixture 2,"Feb. 2, 2020",DRAW,3,5:00

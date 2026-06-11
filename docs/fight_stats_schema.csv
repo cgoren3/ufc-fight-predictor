@@ -16,3 +16,7 @@ control_seconds,recommended,number,Control time in seconds.
 head_landed,optional,number,Significant or tracked head strikes landed.
 body_landed,optional,number,Significant or tracked body strikes landed.
 leg_landed,optional,number,Significant or tracked leg strikes landed.
+raw_kd,optional,string,Raw knockdown value preserved from adapted third-party datasets when parsing is uncertain.
+raw_str,optional,string,Raw strike value preserved from adapted third-party datasets when parsing is uncertain.
+raw_td,optional,string,Raw takedown value preserved from adapted third-party datasets when parsing is uncertain.
+raw_sub,optional,string,Raw submission-attempt value preserved from adapted third-party datasets when parsing is uncertain.
