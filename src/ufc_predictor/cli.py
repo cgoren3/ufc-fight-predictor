@@ -200,7 +200,8 @@ def dataset_columns(
         _runtime_error(str(exc))
     _print(f"CSV columns under {source}:")
     for info in infos:
-        _print(f"- {info.path}:")
+        _print(f"- {info.path.name}:")
+        _print(f"  path: {info.path}")
         _print("  " + ", ".join(info.columns))
 
 
