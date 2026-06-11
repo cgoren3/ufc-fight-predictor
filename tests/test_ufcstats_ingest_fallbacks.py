@@ -169,6 +169,8 @@ def test_data_summary_detects_imported_data(tmp_path) -> None:
     assert "Fights rows: 8" in result.output
     assert "Fight stats rows: 16" in result.output
     assert "Unique fighters: 8" in result.output
+    assert "Too small for meaningful model training" in result.output
+    assert "Backtest reliability will be limited" in result.output
 
 
 def test_build_dataset_uses_imported_data_and_warns_on_tiny_dataset(tmp_path) -> None:
@@ -195,6 +197,37 @@ def test_build_dataset_uses_imported_data_and_warns_on_tiny_dataset(tmp_path) ->
 
     assert result.exit_code == 0
     assert "Using real CSV imports" in result.output
+    assert "Using csv import data for dataset build" in result.output
     assert "Wrote 8 training rows" in result.output
     assert "Warning: only 8 training rows" in result.output
     assert pd.read_csv(raw_dir / "fights.csv").loc[0, "event_name"] == "Offline Import FC 1"
+
+
+def test_validate_imports_command_reports_warnings_for_tiny_valid_imports() -> None:
+    result = runner.invoke(app, ["validate-imports", "--import-dir", str(FIXTURE_IMPORTS)])
+
+    assert result.exit_code == 0
+    assert "Import validation passed" in result.output
+    assert "fights rows: 8" in result.output
+    assert "Too small for meaningful model training" in result.output
+    assert "Backtest reliability will be limited" in result.output
+
+
+def test_validate_imports_fails_cleanly_for_bad_winner(tmp_path) -> None:
+    import_dir = tmp_path / "imports"
+    import_dir.mkdir()
+    (import_dir / "fights.csv").write_text(
+        "fight_id,fight_date,fighter_a,fighter_b,winner\n"
+        "1,2024-01-01,A,B,C\n",
+        encoding="utf-8",
+    )
+    (import_dir / "fighters.csv").write_text("name\nA\nB\n", encoding="utf-8")
+    (import_dir / "fight_stats.csv").write_text(
+        "fight_id,fighter,opponent\n1,A,B\n1,B,A\n",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(app, ["validate-imports", "--import-dir", str(import_dir)])
+
+    assert result.exit_code == 1
+    assert "winner must match fighter_a or fighter_b" in result.output

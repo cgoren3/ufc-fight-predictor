@@ -1,0 +1,11 @@
+column,required,type,description
+name,required,string,Fighter name exactly as used in fights and fight_stats.
+stance,recommended,string,Orthodox Southpaw Switch Open Stance Sideways or Unknown.
+height_in,recommended,number,Height in inches.
+weight_lb,recommended,number,Fighter listed weight in pounds.
+reach_in,recommended,number,Reach in inches.
+date_of_birth,recommended,date,Fighter date of birth in YYYY-MM-DD or parseable date format.
+country,optional,string,Fighter country.
+state,optional,string,Fighter state/province when known.
+record,optional,string,Optional pro-style record text if available.
+source_url,optional,string,Source page or provenance URL.

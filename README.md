@@ -100,6 +100,7 @@ This uses the local HTML file to discover event links. Event-detail pages still 
 To import real raw CSV data instead of scraping, place `fights.csv`, and optionally `fighters.csv`, `fight_stats.csv`, and `events.csv`, under `data/raw/imports/`, then run:
 
 ```bash
+ufc-predict validate-imports
 ufc-predict import-csv
 ```
 
@@ -118,6 +119,7 @@ The summary prints row counts for fights, fighters, fight stats, scorecards, uni
 Codespaces may not be able to connect to UFCStats reliably. The recommended real-data path is to export/download historical data as CSV files under `data/raw/imports/`, then run:
 
 ```bash
+ufc-predict validate-imports
 ufc-predict import-csv
 ufc-predict data-summary
 ufc-predict build-dataset
@@ -158,6 +160,15 @@ round_4_a,round_4_b,round_5_a,round_5_b,total_a,total_b,decision_type
 ```
 
 `build-dataset` automatically imports `data/raw/imports/fights.csv` when present. It refuses to build from bundled sample data unless `--use-sample-data` is passed, and it warns when fewer than 500 training rows are produced.
+
+Full schema files live in:
+
+- `docs/fights_schema.csv`
+- `docs/fighters_schema.csv`
+- `docs/fight_stats_schema.csv`
+- `docs/scorecards_schema.csv`
+
+Additional import guidance lives in `docs/import_data.md`.
 
 ## Manual Data
 

@@ -8,6 +8,7 @@ import pandas as pd
 from ufc_predictor.config import settings
 from ufc_predictor.data_sources import SOURCE_SAMPLE, imports_dir_has_fights, read_source_metadata, summarize_raw_data
 from ufc_predictor.data_io import InputDataError, read_optional_csv, read_required_csv
+from ufc_predictor.import_validation import MIN_MEANINGFUL_FIGHTS, MIN_RELIABLE_BACKTEST_FIGHTS
 
 try:
     import typer
@@ -186,6 +187,26 @@ def import_csv(
         _print(f"- {name}: {path}")
 
 
+@app.command("validate-imports")
+def validate_imports(
+    import_dir: Path = typer.Option(settings.raw_data_dir / "imports", help="Directory containing real raw CSV imports."),
+) -> None:
+    from ufc_predictor.import_validation import validate_import_directory
+
+    result = validate_import_directory(import_dir)
+    _print(f"Import directory: {result.import_dir}")
+    for name, count in result.counts.items():
+        _print(f"{name} rows: {count}")
+    _print(f"Date range: {result.date_range['start'] or 'n/a'} to {result.date_range['end'] or 'n/a'}")
+    for warning in result.warnings:
+        _print(f"[yellow]Warning: {warning}[/yellow]")
+    for error in result.errors:
+        _print(f"[red]Error: {error}[/red]")
+    if not result.ok:
+        raise typer.Exit(1)
+    _print("Import validation passed.")
+
+
 @app.command("check-ufcstats")
 def check_ufcstats() -> None:
     from ufc_predictor.ingest.ufcstats_scraper import check_completed_events_page
@@ -210,6 +231,11 @@ def data_summary(
     _print(f"Scorecards rows: {summary['scorecards_row_count']}")
     _print(f"Unique fighters: {summary['unique_fighters']}")
     _print(f"Date range: {date_range['start'] or 'n/a'} to {date_range['end'] or 'n/a'}")
+    fights_count = summary["fights_row_count"]
+    if fights_count < MIN_MEANINGFUL_FIGHTS:
+        _print("[yellow]Warning: Too small for meaningful model training[/yellow]")
+    if fights_count < MIN_RELIABLE_BACKTEST_FIGHTS:
+        _print("[yellow]Warning: Backtest reliability will be limited[/yellow]")
 
 
 @app.command("load-scorecards")
@@ -242,7 +268,7 @@ def build_dataset(
     if use_sample_data:
         fights, fighters, fight_stats, scorecards = load_sample_data()
         write_sample_data(raw_output_dir)
-        _print("Using bundled sample/dev data for dataset build.")
+        _print("Using sample/dev data for dataset build.")
     else:
         if imports_dir_has_fights(imports_dir):
             try:
@@ -260,6 +286,7 @@ def build_dataset(
                 "Refusing to build from sample data without --use-sample-data. "
                 "Run `ufc-predict import-csv`, `ufc-predict ingest-ufcstats`, or pass --use-sample-data for development."
             )
+        _print(f"Using {source_metadata.get('source', 'unknown')} data for dataset build.")
         try:
             fights = read_required_csv(fights_csv, required_columns=REQUIRED_FIGHT_COLUMNS, label="fights CSV")
         except InputDataError as exc:

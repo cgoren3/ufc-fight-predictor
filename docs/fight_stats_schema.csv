@@ -1,0 +1,18 @@
+column,required,type,description
+fight_id,required,integer,Must match fights.fight_id.
+source_url,optional,string,Source page or provenance URL.
+fighter,required,string,Fighter for this stats row.
+opponent,required,string,Opponent for this stats row.
+knockdowns,recommended,number,Knockdowns scored by fighter.
+sig_str_landed,recommended,number,Significant strikes landed.
+sig_str_attempted,recommended,number,Significant strikes attempted.
+total_str_landed,recommended,number,Total strikes landed.
+total_str_attempted,recommended,number,Total strikes attempted.
+takedowns_landed,recommended,number,Takedowns landed.
+takedowns_attempted,recommended,number,Takedowns attempted.
+submission_attempts,recommended,number,Submission attempts.
+reversals,recommended,number,Reversals.
+control_seconds,recommended,number,Control time in seconds.
+head_landed,optional,number,Significant or tracked head strikes landed.
+body_landed,optional,number,Significant or tracked body strikes landed.
+leg_landed,optional,number,Significant or tracked leg strikes landed.

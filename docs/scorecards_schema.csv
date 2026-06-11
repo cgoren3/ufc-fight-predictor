@@ -1,0 +1,19 @@
+column,required,type,description
+event,required,string,Event name.
+fight_date,required,date,Date the fight occurred.
+fighter_a,required,string,First fighter as listed in scorecard row.
+fighter_b,required,string,Second fighter as listed in scorecard row.
+judge,required,string,Judge name.
+round_1_a,required,number,Fighter A round 1 score.
+round_1_b,required,number,Fighter B round 1 score.
+round_2_a,required,number,Fighter A round 2 score.
+round_2_b,required,number,Fighter B round 2 score.
+round_3_a,required,number,Fighter A round 3 score.
+round_3_b,required,number,Fighter B round 3 score.
+round_4_a,optional,number,Fighter A round 4 score.
+round_4_b,optional,number,Fighter B round 4 score.
+round_5_a,optional,number,Fighter A round 5 score.
+round_5_b,optional,number,Fighter B round 5 score.
+total_a,required,number,Fighter A total score.
+total_b,required,number,Fighter B total score.
+decision_type,required,string,unanimous split majority draw or other decision type.

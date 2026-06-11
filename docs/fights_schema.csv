@@ -1,0 +1,20 @@
+column,required,type,description
+fight_id,recommended,integer,Stable fight identifier used to join fight_stats.
+event_id,optional,integer,Stable event identifier if available.
+event_name,recommended,string,UFC event name.
+fight_date,required,date,Date the fight occurred in YYYY-MM-DD or parseable date format.
+event_location,optional,string,Event location text.
+fighter_a,required,string,First fighter name exactly as used across files.
+fighter_b,required,string,Second fighter name exactly as used across files.
+winner,required,string,Winner name; must match fighter_a or fighter_b for completed fights.
+method,recommended,string,Result method such as KO/TKO Submission Decision - Unanimous.
+finish_round,recommended,integer,Round in which fight ended.
+finish_time,recommended,string,Clock time in finish round such as 5:00.
+weight_class,recommended,string,UFC weight class.
+scheduled_rounds,recommended,integer,Usually 3 or 5.
+main_event,optional,integer,1 if main event else 0.
+title_fight,optional,integer,1 if title fight else 0.
+catchweight,optional,integer,1 if catchweight else 0.
+missed_weight,optional,integer,1 if either fighter missed weight else 0.
+short_notice_replacement,optional,integer,1 if short-notice replacement is known.
+source_url,optional,string,Source page or provenance URL.
