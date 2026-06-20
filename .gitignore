@@ -20,3 +20,4 @@ data/processed/
 
 # Generated raw-data metadata
 data/raw/source_metadata.json
+data/raw/imports/fight_enrichment_template.csv

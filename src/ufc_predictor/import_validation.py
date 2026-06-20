@@ -8,10 +8,10 @@ import pandas as pd
 
 from ufc_predictor.data_io import InputDataError, inspect_csv
 from ufc_predictor.enrichment import (
-    ENRICHMENT_COLUMNS,
     EnrichmentError,
     fight_identity_key,
     is_unknown_weight_class,
+    normalize_enrichment_frame,
     validate_enrichment_frame,
 )
 from ufc_predictor.ingest.scorecards_loader import REQUIRED_COLUMNS as SCORECARD_COLUMNS
@@ -117,8 +117,18 @@ def _validate_enrichment_applied(import_dir: Path, fights: pd.DataFrame, result:
     enrichment_path = import_dir / "fight_enrichment.csv"
     if not enrichment_path.exists():
         return
-    enrichment = _read_csv_if_valid(enrichment_path, ENRICHMENT_COLUMNS, "fight_enrichment.csv", result)
-    if enrichment is None:
+    try:
+        inspect_csv(enrichment_path, require_rows=True, label="fight_enrichment.csv")
+        raw_enrichment = pd.read_csv(enrichment_path)
+    except InputDataError as exc:
+        result.errors.append(str(exc))
+        return
+    try:
+        enrichment, _, warnings = normalize_enrichment_frame(fights, raw_enrichment)
+        for warning in warnings:
+            result.warnings.append(warning)
+    except EnrichmentError as exc:
+        result.errors.append(str(exc))
         return
     try:
         for warning in validate_enrichment_frame(enrichment):

@@ -176,10 +176,13 @@ fight_date,event,fighter_a,fighter_b,weight_class,event_location,main_event,titl
 Use this when a Kaggle or third-party dataset has fight outcomes and stats but lacks reliable weight class, event location, main-event status, title-fight status, or scheduled rounds. The join uses fight date, event name, and the sorted fighter pair, so fighter order can be either orientation. Apply enrichment before importing normalized raw data:
 
 ```bash
+ufc-predict build-enrichment-template
 ufc-predict import-enrichment
 ufc-predict validate-imports
 ufc-predict import-csv
 ```
+
+Use `ufc-predict enrichment-summary` to check enrichment coverage. Full instructions are in `docs/enrichment.md`.
 
 `build-dataset` automatically imports `data/raw/imports/fights.csv` when present. It refuses to build from bundled sample data unless `--use-sample-data` is passed, and it warns when fewer than 500 training rows are produced.
 
@@ -218,6 +221,7 @@ The adapter also supports long-format fighter-performance CSVs with columns such
 If the adapted file leaves `weight_class` as `Unknown`, `event_location` blank, or `main_event` as all zeroes, create `data/raw/imports/fight_enrichment.csv` and run:
 
 ```bash
+ufc-predict build-enrichment-template
 ufc-predict import-enrichment
 ufc-predict validate-imports
 ufc-predict import-csv

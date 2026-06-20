@@ -79,12 +79,15 @@ fight_date,event,fighter_a,fighter_b,weight_class,event_location,main_event,titl
 Apply it before importing normalized raw data:
 
 ```bash
+ufc-predict build-enrichment-template
 ufc-predict import-enrichment
 ufc-predict validate-imports
 ufc-predict import-csv
 ```
 
 If validation says enrichment values have not been applied, rerun `ufc-predict import-enrichment`.
+
+Use `ufc-predict enrichment-summary` to check coverage. See `docs/enrichment.md` for the full workflow and event-level enrichment rules.
 
 ## Optional Odds
 

@@ -21,8 +21,21 @@ ENRICHMENT_COLUMNS = [
     "title_fight",
     "scheduled_rounds",
 ]
+EVENT_ENRICHMENT_COLUMNS = [
+    "event",
+    "event_date",
+    "weight_class",
+    "event_location",
+    "main_event",
+    "title_fight",
+    "scheduled_rounds",
+]
 ENRICHABLE_FIELDS = ["weight_class", "event_location", "main_event", "title_fight", "scheduled_rounds"]
 UNKNOWN_WEIGHT_VALUES = {"", "unknown", "unk", "n/a", "na", "none", "nan"}
+MISSING_ENRICHMENT_GUIDANCE = (
+    "Run ufc-predict build-enrichment-template, fill in the missing columns, "
+    "save it as data/raw/imports/fight_enrichment.csv, then rerun import-enrichment."
+)
 
 
 class EnrichmentError(InputDataError):
@@ -40,6 +53,7 @@ class EnrichmentReport:
     unmatched_enrichment_rows: int = 0
     updated_fields: dict[str, int] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
+    source_format: str = "fight"
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -52,6 +66,29 @@ class EnrichmentReport:
             "unmatched_enrichment_rows": self.unmatched_enrichment_rows,
             "updated_fields": self.updated_fields,
             "warnings": self.warnings,
+            "source_format": self.source_format,
+        }
+
+
+@dataclass
+class EnrichmentSummary:
+    path: Path
+    total_fights: int
+    known_weight_class_pct: float
+    known_event_location_pct: float
+    known_main_event_pct: float
+    known_title_fight_pct: float
+    known_scheduled_rounds_pct: float
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "path": str(self.path),
+            "total_fights": self.total_fights,
+            "known_weight_class_pct": self.known_weight_class_pct,
+            "known_event_location_pct": self.known_event_location_pct,
+            "known_main_event_pct": self.known_main_event_pct,
+            "known_title_fight_pct": self.known_title_fight_pct,
+            "known_scheduled_rounds_pct": self.known_scheduled_rounds_pct,
         }
 
 
@@ -99,6 +136,10 @@ def _enrichment_key(row: pd.Series | dict[str, Any]) -> str:
     )
 
 
+def _event_key(event: Any, fight_date: Any) -> str:
+    return "||".join([_date_key(fight_date), _key_text(event)])
+
+
 def is_unknown_weight_class(value: Any) -> bool:
     return _key_text(value) in UNKNOWN_WEIGHT_VALUES
 
@@ -130,6 +171,128 @@ def _numeric_location_values(series: pd.Series) -> list[str]:
     values = values.loc[values != ""]
     numeric = values.loc[values.str.fullmatch(r"[-+]?\d+(\.\d+)?", na=False)]
     return numeric.head(5).tolist()
+
+
+def _percent(numerator: int | float, denominator: int | float) -> float:
+    if not denominator:
+        return 0.0
+    return round(float(numerator) / float(denominator) * 100.0, 2)
+
+
+def _series_or_blank(frame: pd.DataFrame, column: str) -> pd.Series:
+    if column in frame.columns:
+        return frame[column]
+    return pd.Series([""] * len(frame), index=frame.index)
+
+
+def _has_positive_binary(series: pd.Series) -> bool:
+    numeric = pd.to_numeric(series, errors="coerce")
+    return bool(numeric.eq(1).any())
+
+
+def _known_binary_mask(series: pd.Series) -> pd.Series:
+    values = series.dropna().astype(str).str.strip()
+    if values.empty:
+        return pd.Series([False] * len(series), index=series.index)
+    numeric = pd.to_numeric(series, errors="coerce")
+    if not bool(numeric.eq(1).any()):
+        return pd.Series([False] * len(series), index=series.index)
+    return numeric.isin([0, 1])
+
+
+def enrichment_summary_from_frame(frame: pd.DataFrame, path: str | Path) -> EnrichmentSummary:
+    total = int(len(frame))
+    weight = _series_or_blank(frame, "weight_class")
+    location = _series_or_blank(frame, "event_location")
+    main_event = _series_or_blank(frame, "main_event")
+    title_fight = _series_or_blank(frame, "title_fight")
+    scheduled = pd.to_numeric(_series_or_blank(frame, "scheduled_rounds"), errors="coerce")
+    known_weight = int(weight.map(lambda value: _non_empty(value) and not is_unknown_weight_class(value)).sum())
+    known_location = int(location.map(_non_empty).sum())
+    known_main = int(_known_binary_mask(main_event).sum())
+    known_title = int(_known_binary_mask(title_fight).sum())
+    known_scheduled = int(scheduled.isin([3, 5]).sum())
+    return EnrichmentSummary(
+        path=Path(path),
+        total_fights=total,
+        known_weight_class_pct=_percent(known_weight, total),
+        known_event_location_pct=_percent(known_location, total),
+        known_main_event_pct=_percent(known_main, total),
+        known_title_fight_pct=_percent(known_title, total),
+        known_scheduled_rounds_pct=_percent(known_scheduled, total),
+    )
+
+
+def summarize_enrichment_file(path: str | Path | None = None) -> EnrichmentSummary:
+    summary_path = Path(path) if path else _default_enrichment_summary_path()
+    inspect_csv(summary_path, require_rows=True, label="enrichment CSV")
+    frame = pd.read_csv(summary_path)
+    if "event_date" in frame.columns and "fight_date" not in frame.columns:
+        frame = frame.rename(columns={"event_date": "fight_date"})
+    return enrichment_summary_from_frame(frame, summary_path)
+
+
+def _default_enrichment_summary_path() -> Path:
+    import_dir = settings.raw_data_dir / "imports"
+    enrichment = import_dir / "fight_enrichment.csv"
+    template = import_dir / "fight_enrichment_template.csv"
+    if enrichment.exists():
+        return enrichment
+    if template.exists():
+        return template
+    return import_dir / "fights.csv"
+
+
+def _event_column(fights: pd.DataFrame) -> str:
+    return "event_name" if "event_name" in fights.columns else "event"
+
+
+def _template_binary_value(series: pd.Series, value: Any) -> Any:
+    if not _has_positive_binary(series):
+        return ""
+    normalized = _normalize_binary(value, "binary")
+    return "" if normalized is None else normalized
+
+
+def build_enrichment_template(
+    fights_path: str | Path | None = None,
+    output_path: str | Path | None = None,
+) -> tuple[pd.DataFrame, Path]:
+    fights_csv = Path(fights_path) if fights_path else settings.raw_data_dir / "imports" / "fights.csv"
+    output = Path(output_path) if output_path else settings.raw_data_dir / "imports" / "fight_enrichment_template.csv"
+    inspect_csv(fights_csv, required_columns=["fight_date", "fighter_a", "fighter_b"], require_rows=True, label="fights CSV")
+    fights = pd.read_csv(fights_csv)
+    event_column = _event_column(fights)
+    main_event_series = _series_or_blank(fights, "main_event")
+    title_fight_series = _series_or_blank(fights, "title_fight")
+
+    rows: list[dict[str, Any]] = []
+    for _, fight in fights.iterrows():
+        weight_class = fight.get("weight_class", "Unknown")
+        if not _non_empty(weight_class):
+            weight_class = "Unknown"
+        scheduled = fight.get("scheduled_rounds", "")
+        try:
+            scheduled = _normalize_scheduled_rounds(scheduled) or ""
+        except EnrichmentError:
+            scheduled = ""
+        rows.append(
+            {
+                "fight_date": _date_key(fight.get("fight_date")) or fight.get("fight_date", ""),
+                "event": fight.get(event_column, ""),
+                "fighter_a": fight.get("fighter_a", ""),
+                "fighter_b": fight.get("fighter_b", ""),
+                "weight_class": weight_class,
+                "event_location": _clean(fight.get("event_location", fight.get("location", ""))),
+                "main_event": _template_binary_value(main_event_series, fight.get("main_event", "")),
+                "title_fight": _template_binary_value(title_fight_series, fight.get("title_fight", "")),
+                "scheduled_rounds": scheduled,
+            }
+        )
+    frame = pd.DataFrame(rows, columns=ENRICHMENT_COLUMNS)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    frame.to_csv(output, index=False)
+    return frame, output
 
 
 def validate_enrichment_frame(frame: pd.DataFrame) -> list[str]:
@@ -179,14 +342,136 @@ def validate_enrichment_frame(frame: pd.DataFrame) -> list[str]:
     return warnings
 
 
+def validate_event_enrichment_frame(frame: pd.DataFrame) -> list[str]:
+    missing = [column for column in EVENT_ENRICHMENT_COLUMNS if column not in frame.columns]
+    if missing:
+        raise EnrichmentError(f"event-level enrichment CSV is missing required columns: {', '.join(missing)}")
+    if frame.empty:
+        raise EnrichmentError("event-level enrichment CSV has headers but no data rows.")
+    dates = pd.to_datetime(frame["event_date"], errors="coerce")
+    bad_dates = int(dates.isna().sum())
+    if bad_dates:
+        raise EnrichmentError(f"event-level enrichment CSV has {bad_dates} unparseable event_date values.")
+    for field in ["main_event", "title_fight"]:
+        invalid = []
+        for value in frame[field]:
+            try:
+                _normalize_binary(value, field)
+            except EnrichmentError:
+                invalid.append(value)
+        if invalid:
+            raise EnrichmentError(f"{field} values must be 0 or 1. Invalid sample: {invalid[:5]}")
+    invalid_rounds = []
+    for value in frame["scheduled_rounds"]:
+        try:
+            _normalize_scheduled_rounds(value)
+        except EnrichmentError:
+            invalid_rounds.append(value)
+    if invalid_rounds:
+        raise EnrichmentError(f"scheduled_rounds values must be 3 or 5 where known. Invalid sample: {invalid_rounds[:5]}")
+    numeric_locations = _numeric_location_values(frame["event_location"])
+    if numeric_locations:
+        raise EnrichmentError(
+            "event_location must be categorical location text, not numeric values. "
+            f"Invalid sample: {numeric_locations}"
+        )
+    return []
+
+
+def event_enrichment_to_fight_enrichment(
+    fights: pd.DataFrame,
+    event_enrichment: pd.DataFrame,
+) -> tuple[pd.DataFrame, list[str]]:
+    warnings = validate_event_enrichment_frame(event_enrichment)
+    event_column = _event_column(fights)
+    fight_groups: dict[str, pd.DataFrame] = {}
+    event_keys = fights.apply(lambda row: _event_key(row.get(event_column), row.get("fight_date")), axis=1)
+    for key, group in fights.groupby(event_keys):
+        if key:
+            fight_groups[str(key)] = group
+
+    event_copy = event_enrichment.copy()
+    event_copy["_event_key"] = event_copy.apply(lambda row: _event_key(row.get("event"), row.get("event_date")), axis=1)
+    duplicate_keys = event_copy["_event_key"].loc[event_copy["_event_key"].duplicated()].unique().tolist()
+    if duplicate_keys:
+        raise EnrichmentError(f"event-level enrichment CSV has duplicate event keys. Duplicate sample: {duplicate_keys[:5]}")
+
+    rows: list[dict[str, Any]] = []
+    skipped_fight_specific = 0
+    unmatched_events = 0
+    for _, event_row in event_copy.iterrows():
+        group = fight_groups.get(str(event_row["_event_key"]))
+        if group is None or group.empty:
+            unmatched_events += 1
+            continue
+        single_fight_event = len(group) == 1
+        if not single_fight_event:
+            fight_specific_values = [
+                event_row.get("weight_class"),
+                event_row.get("main_event"),
+                event_row.get("title_fight"),
+                event_row.get("scheduled_rounds"),
+            ]
+            if any(_non_empty(value) for value in fight_specific_values):
+                skipped_fight_specific += len(group)
+        for _, fight in group.iterrows():
+            if single_fight_event:
+                weight_class = event_row.get("weight_class", "")
+                main_event = event_row.get("main_event", "")
+                title_fight = event_row.get("title_fight", "")
+                scheduled_rounds = event_row.get("scheduled_rounds", "")
+            else:
+                weight_class = ""
+                main_event = ""
+                title_fight = ""
+                scheduled_rounds = ""
+            rows.append(
+                {
+                    "fight_date": _date_key(fight.get("fight_date")),
+                    "event": fight.get(event_column, ""),
+                    "fighter_a": fight.get("fighter_a", ""),
+                    "fighter_b": fight.get("fighter_b", ""),
+                    "weight_class": weight_class,
+                    "event_location": event_row.get("event_location", ""),
+                    "main_event": main_event,
+                    "title_fight": title_fight,
+                    "scheduled_rounds": scheduled_rounds,
+                }
+            )
+    if unmatched_events:
+        warnings.append(f"Event-level enrichment had {unmatched_events} event rows that did not match fights.csv.")
+    if skipped_fight_specific:
+        warnings.append(
+            "Event-level enrichment matched multi-fight events; applied event_location but skipped fight-specific "
+            f"fields for {skipped_fight_specific} fight rows. Use fight-level enrichment for weight_class, "
+            "main_event, title_fight, and scheduled_rounds on multi-fight events."
+        )
+    return pd.DataFrame(rows, columns=ENRICHMENT_COLUMNS), warnings
+
+
+def normalize_enrichment_frame(fights: pd.DataFrame, enrichment: pd.DataFrame) -> tuple[pd.DataFrame, str, list[str]]:
+    columns = set(enrichment.columns)
+    if set(ENRICHMENT_COLUMNS) <= columns:
+        return enrichment[ENRICHMENT_COLUMNS].copy(), "fight", []
+    if set(EVENT_ENRICHMENT_COLUMNS) <= columns:
+        frame, warnings = event_enrichment_to_fight_enrichment(fights, enrichment[EVENT_ENRICHMENT_COLUMNS].copy())
+        return frame, "event", warnings
+    raise EnrichmentError(
+        "Enrichment CSV must use either fight-level columns "
+        f"({', '.join(ENRICHMENT_COLUMNS)}) or event-level columns ({', '.join(EVENT_ENRICHMENT_COLUMNS)})."
+    )
+
+
 def merge_enrichment_into_fights(
     fights: pd.DataFrame,
     enrichment: pd.DataFrame,
     fights_path: str | Path,
     enrichment_path: str | Path,
     output_path: str | Path,
+    source_format: str = "fight",
+    extra_warnings: list[str] | None = None,
 ) -> tuple[pd.DataFrame, EnrichmentReport]:
-    warnings = validate_enrichment_frame(enrichment)
+    warnings = [*validate_enrichment_frame(enrichment), *(extra_warnings or [])]
     merged = fights.copy()
     for field in ENRICHABLE_FIELDS:
         if field not in merged.columns:
@@ -258,6 +543,7 @@ def merge_enrichment_into_fights(
         unmatched_enrichment_rows=unmatched,
         updated_fields=updated_fields,
         warnings=warnings,
+        source_format=source_format,
     )
     return merged, report
 
@@ -272,15 +558,19 @@ def import_enrichment_csv(
     output = Path(output_path) if output_path else fights_csv
 
     inspect_csv(fights_csv, required_columns=["fighter_a", "fighter_b", "fight_date"], require_rows=True, label="fights CSV")
-    inspect_csv(source, required_columns=ENRICHMENT_COLUMNS, require_rows=True, label="fight_enrichment.csv")
+    if not source.exists():
+        raise EnrichmentError(f"Missing fight_enrichment.csv at {source}. {MISSING_ENRICHMENT_GUIDANCE}")
+    inspect_csv(source, require_rows=True, label="fight_enrichment.csv")
     fights = pd.read_csv(fights_csv)
-    enrichment = pd.read_csv(source)
+    enrichment, source_format, warnings = normalize_enrichment_frame(fights, pd.read_csv(source))
     merged, report = merge_enrichment_into_fights(
         fights=fights,
         enrichment=enrichment,
         fights_path=fights_csv,
         enrichment_path=source,
         output_path=output,
+        source_format=source_format,
+        extra_warnings=warnings,
     )
     output.parent.mkdir(parents=True, exist_ok=True)
     merged.to_csv(output, index=False)

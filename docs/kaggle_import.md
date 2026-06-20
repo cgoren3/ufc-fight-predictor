@@ -86,6 +86,7 @@ fight_date,event,fighter_a,fighter_b,weight_class,event_location,main_event,titl
 Then run:
 
 ```bash
+ufc-predict build-enrichment-template
 ufc-predict import-enrichment
 ufc-predict validate-imports
 ufc-predict import-csv

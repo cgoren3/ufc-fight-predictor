@@ -225,6 +225,53 @@ def import_csv(
         _print(f"- {name}: {path}")
 
 
+@app.command("build-enrichment-template")
+def build_enrichment_template(
+    fights_path: Path = typer.Option(
+        settings.raw_data_dir / "imports" / "fights.csv",
+        help="Import-schema fights.csv used to create the enrichment template.",
+    ),
+    output_path: Path = typer.Option(
+        settings.raw_data_dir / "imports" / "fight_enrichment_template.csv",
+        help="Template CSV output path.",
+    ),
+) -> None:
+    from ufc_predictor.enrichment import build_enrichment_template as build_template
+
+    try:
+        frame, path = build_template(fights_path=fights_path, output_path=output_path)
+    except InputDataError as exc:
+        _runtime_error(f"Could not build enrichment template:\n{exc}")
+    _print(f"Wrote enrichment template with {len(frame)} fight rows to {path}")
+    _print(
+        "Fill missing fields, save it as data/raw/imports/fight_enrichment.csv, "
+        "then run `ufc-predict import-enrichment`."
+    )
+
+
+@app.command("enrichment-summary")
+def enrichment_summary(
+    path: Optional[Path] = typer.Option(
+        None,
+        "--path",
+        help="Enrichment/template CSV to summarize. Defaults to fight_enrichment.csv, then template, then imports fights.csv.",
+    ),
+) -> None:
+    from ufc_predictor.enrichment import summarize_enrichment_file
+
+    try:
+        summary = summarize_enrichment_file(path)
+    except InputDataError as exc:
+        _runtime_error(f"Could not summarize enrichment data:\n{exc}")
+    _print(f"Enrichment source: {summary.path}")
+    _print(f"Total fights: {summary.total_fights}")
+    _print(f"Known weight_class: {summary.known_weight_class_pct:.1f}%")
+    _print(f"Known event_location: {summary.known_event_location_pct:.1f}%")
+    _print(f"Known main_event: {summary.known_main_event_pct:.1f}%")
+    _print(f"Known title_fight: {summary.known_title_fight_pct:.1f}%")
+    _print(f"Known scheduled_rounds: {summary.known_scheduled_rounds_pct:.1f}%")
+
+
 @app.command("import-enrichment")
 def import_enrichment(
     enrichment_path: Path = typer.Option(
@@ -253,9 +300,17 @@ def import_enrichment(
         note = ""
         if fights_path.exists():
             note = f"\nExisting fights.csv was not modified: {fights_path}"
-        _runtime_error(f"Fight enrichment import failed:\n{exc}{note}")
+        guidance = ""
+        if "build-enrichment-template" in str(exc):
+            guidance = (
+                "\nRun ufc-predict build-enrichment-template\n"
+                "Fill in the missing columns, save it as data/raw/imports/fight_enrichment.csv, "
+                "then rerun import-enrichment."
+            )
+        _runtime_error(f"Fight enrichment import failed:\n{exc}{guidance}{note}")
 
     _print(f"Applied fight enrichment from {enrichment_path}")
+    _print(f"Enrichment format: {report.source_format}-level")
     _print(f"Fights rows: {report.fights_rows}")
     _print(f"Enrichment rows: {report.enrichment_rows}")
     _print(f"Matched enrichment rows: {report.matched_rows}")

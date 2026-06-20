@@ -100,8 +100,137 @@ def test_import_enrichment_command(tmp_path) -> None:
     )
 
     assert result.exit_code == 0
+    assert "Enrichment format: fight-level" in result.output
     assert "Matched enrichment rows: 1" in result.output
     assert "weight_class: 1" in result.output
+
+
+def test_build_enrichment_template_command(tmp_path) -> None:
+    import_dir = tmp_path / "imports"
+    output = tmp_path / "fight_enrichment_template.csv"
+    _write_minimal_imports(import_dir)
+
+    result = runner.invoke(
+        app,
+        [
+            "build-enrichment-template",
+            "--fights-path",
+            str(import_dir / "fights.csv"),
+            "--output-path",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Wrote enrichment template with 1 fight rows" in result.output
+    template = pd.read_csv(output)
+    assert list(template.columns) == [
+        "fight_date",
+        "event",
+        "fighter_a",
+        "fighter_b",
+        "weight_class",
+        "event_location",
+        "main_event",
+        "title_fight",
+        "scheduled_rounds",
+    ]
+    assert template.loc[0, "event"] == "UFC Test 1"
+    assert template.loc[0, "weight_class"] == "Unknown"
+    assert pd.isna(template.loc[0, "main_event"])
+
+
+def test_enrichment_summary_command(tmp_path) -> None:
+    path = tmp_path / "fight_enrichment_template.csv"
+    pd.DataFrame(
+        [
+            {
+                "fight_date": "2020-01-01",
+                "event": "UFC Test 1",
+                "fighter_a": "Alice Alpha",
+                "fighter_b": "Beth Beta",
+                "weight_class": "Lightweight",
+                "event_location": "Las Vegas",
+                "main_event": 1,
+                "title_fight": 0,
+                "scheduled_rounds": 5,
+            },
+            {
+                "fight_date": "2020-01-01",
+                "event": "UFC Test 1",
+                "fighter_a": "Cara Delta",
+                "fighter_b": "Dana Echo",
+                "weight_class": "Unknown",
+                "event_location": "",
+                "main_event": 0,
+                "title_fight": 0,
+                "scheduled_rounds": 3,
+            },
+        ]
+    ).to_csv(path, index=False)
+
+    result = runner.invoke(app, ["enrichment-summary", "--path", str(path)])
+
+    assert result.exit_code == 0
+    assert "Total fights: 2" in result.output
+    assert "Known weight_class: 50.0%" in result.output
+    assert "Known event_location: 50.0%" in result.output
+    assert "Known main_event: 100.0%" in result.output
+    assert "Known scheduled_rounds: 100.0%" in result.output
+
+
+def test_import_enrichment_missing_file_error_points_to_template_workflow(tmp_path) -> None:
+    import_dir = tmp_path / "imports"
+    _write_minimal_imports(import_dir)
+
+    result = runner.invoke(
+        app,
+        [
+            "import-enrichment",
+            "--enrichment-path",
+            str(import_dir / "fight_enrichment.csv"),
+            "--fights-path",
+            str(import_dir / "fights.csv"),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "Run ufc-predict build-enrichment-template" in result.output
+    assert "save it as data/raw/imports/fight_enrichment.csv" in result.output
+
+
+def test_import_enrichment_supports_event_level_location_data(tmp_path) -> None:
+    import_dir = tmp_path / "imports"
+    _write_minimal_imports(import_dir)
+    pd.DataFrame(
+        [
+            {
+                "event": "UFC Test 1",
+                "event_date": "2020-01-01",
+                "weight_class": "",
+                "event_location": "Austin, Texas, USA",
+                "main_event": "",
+                "title_fight": "",
+                "scheduled_rounds": "",
+            }
+        ]
+    ).to_csv(import_dir / "fight_enrichment.csv", index=False)
+
+    result = runner.invoke(
+        app,
+        [
+            "import-enrichment",
+            "--enrichment-path",
+            str(import_dir / "fight_enrichment.csv"),
+            "--fights-path",
+            str(import_dir / "fights.csv"),
+        ],
+    )
+
+    fights = pd.read_csv(import_dir / "fights.csv")
+    assert result.exit_code == 0
+    assert "Enrichment format: event-level" in result.output
+    assert fights.loc[0, "event_location"] == "Austin, Texas, USA"
 
 
 def test_validate_imports_detects_unapplied_enrichment(tmp_path) -> None:
