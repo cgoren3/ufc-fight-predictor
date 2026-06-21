@@ -5,7 +5,7 @@ import pandas as pd
 from typer.testing import CliRunner
 
 from ufc_predictor.cli import app
-from ufc_predictor.enrichment import auto_enrich, import_enrichment_csv
+from ufc_predictor.enrichment import auto_enrich, import_enrichment_csv, merge_enrichment_into_fights
 from ufc_predictor.import_validation import validate_import_directory
 from ufc_predictor.models.evaluate import rolling_backtest
 from ufc_predictor.reporting import build_data_quality_coverage
@@ -105,6 +105,98 @@ def test_import_enrichment_command(tmp_path) -> None:
     assert "weight_class: 1" in result.output
 
 
+def test_import_enrichment_handles_string_destination_columns_and_integer_flags(tmp_path) -> None:
+    import_dir = tmp_path / "imports"
+    import_dir.mkdir(parents=True)
+    fights = pd.DataFrame(
+        {
+            "fight_id": [1],
+            "event_name": ["UFC Test 1"],
+            "fight_date": ["2020-01-01"],
+            "event_location": pd.Series([""], dtype="string"),
+            "fighter_a": ["Alice Alpha"],
+            "fighter_b": ["Beth Beta"],
+            "winner": ["Alice Alpha"],
+            "weight_class": pd.Series(["Unknown"], dtype="string"),
+            "scheduled_rounds": pd.Series([""], dtype="string"),
+            "main_event": pd.Series([""], dtype="string"),
+            "title_fight": pd.Series([""], dtype="string"),
+        }
+    )
+    enrichment = pd.DataFrame(
+        [
+            {
+                "fight_date": "2020-01-01",
+                "event": "UFC Test 1",
+                "fighter_a": "Alice Alpha",
+                "fighter_b": "Beth Beta",
+                "weight_class": "Lightweight",
+                "event_location": "Las Vegas",
+                "main_event": 0,
+                "title_fight": 1,
+                "scheduled_rounds": 5,
+            }
+        ]
+    )
+    fights.to_csv(import_dir / "fights.csv", index=False)
+    enrichment.to_csv(import_dir / "fight_enrichment.csv", index=False)
+
+    report = import_enrichment_csv(import_dir / "fight_enrichment.csv", import_dir / "fights.csv")
+
+    output = pd.read_csv(import_dir / "fights.csv")
+    assert report.matched_rows == 1
+    assert output.loc[0, "main_event"] == 0
+    assert output.loc[0, "title_fight"] == 1
+    assert output.loc[0, "scheduled_rounds"] == 5
+    assert output.loc[0, "weight_class"] == "Lightweight"
+    assert output.loc[0, "event_location"] == "Las Vegas"
+
+
+def test_merge_enrichment_coerces_arrow_string_like_columns_before_assignment(tmp_path) -> None:
+    fights = pd.DataFrame(
+        {
+            "event_name": ["UFC Test 1"],
+            "fight_date": ["2020-01-01"],
+            "fighter_a": ["Alice Alpha"],
+            "fighter_b": ["Beth Beta"],
+            "winner": ["Alice Alpha"],
+            "weight_class": pd.Series(["Unknown"], dtype="string"),
+            "event_location": pd.Series([""], dtype="string"),
+            "main_event": pd.Series([""], dtype="string"),
+            "title_fight": pd.Series([""], dtype="string"),
+            "scheduled_rounds": pd.Series([""], dtype="string"),
+        }
+    )
+    enrichment = pd.DataFrame(
+        [
+            {
+                "fight_date": "2020-01-01",
+                "event": "UFC Test 1",
+                "fighter_a": "Alice Alpha",
+                "fighter_b": "Beth Beta",
+                "weight_class": "Lightweight",
+                "event_location": "Las Vegas",
+                "main_event": 0,
+                "title_fight": 1,
+                "scheduled_rounds": 5,
+            }
+        ]
+    )
+
+    merged, report = merge_enrichment_into_fights(
+        fights=fights,
+        enrichment=enrichment,
+        fights_path=tmp_path / "fights.csv",
+        enrichment_path=tmp_path / "fight_enrichment.csv",
+        output_path=tmp_path / "fights.csv",
+    )
+
+    assert report.matched_rows == 1
+    assert merged.loc[0, "main_event"] == 0
+    assert merged.loc[0, "title_fight"] == 1
+    assert merged.loc[0, "scheduled_rounds"] == 5
+
+
 def test_build_enrichment_template_command(tmp_path) -> None:
     import_dir = tmp_path / "imports"
     output = tmp_path / "fight_enrichment_template.csv"
@@ -173,10 +265,10 @@ def test_enrichment_summary_command(tmp_path) -> None:
 
     assert result.exit_code == 0
     assert "Total fights: 2" in result.output
-    assert "Known weight_class: 50.0%" in result.output
-    assert "Known event_location: 50.0%" in result.output
-    assert "Known main_event: 100.0%" in result.output
-    assert "Known scheduled_rounds: 100.0%" in result.output
+    assert "Known weight_class: 1/2 (50.0%)" in result.output
+    assert "Known event_location: 1/2 (50.0%)" in result.output
+    assert "Known main_event: 2/2 (100.0%)" in result.output
+    assert "Known scheduled_rounds: 2/2 (100.0%)" in result.output
 
 
 def test_auto_enrich_creates_file_and_infers_main_event_and_title(tmp_path) -> None:
@@ -265,6 +357,61 @@ def test_auto_enrich_merges_external_sources(tmp_path) -> None:
     assert frame.loc[0, "main_event"] == 1
 
 
+def test_auto_enrich_discovers_nested_sources_and_joins_event_id_metadata(tmp_path) -> None:
+    template = tmp_path / "fight_enrichment_template.csv"
+    output = tmp_path / "fight_enrichment.csv"
+    source_dir = tmp_path / "sources"
+    nested = source_dir / "ufc_2025_dataset" / "data"
+    nested.mkdir(parents=True)
+    pd.DataFrame(
+        [
+            {
+                "fight_date": "2020-01-01",
+                "event": "UFC Test: Alpha vs. Beta",
+                "fighter_a": "Alice Alpha",
+                "fighter_b": "Beth Beta",
+                "weight_class": "Unknown",
+                "event_location": "",
+                "main_event": "",
+                "title_fight": "",
+                "scheduled_rounds": "",
+            }
+        ]
+    ).to_csv(template, index=False)
+    pd.DataFrame(
+        [
+            {
+                "Event_Id": "E1",
+                "Name": "UFC Test: Alpha vs. Beta",
+                "Date": "2020-01-01",
+                "Location": "Las Vegas, Nevada, USA",
+            }
+        ]
+    ).to_csv(nested / "Events.csv", index=False)
+    pd.DataFrame(
+        [
+            {
+                "Event_Id": "E1",
+                "Fighter_1": "Alice Alpha",
+                "Fighter_2": "Beth Beta",
+                "Weight_Class": "Lightweight",
+                "Time Format": "5 Rnd (5-5-5-5-5)",
+            }
+        ]
+    ).to_csv(nested / "Fights.csv", index=False)
+
+    frame, report = auto_enrich(template_path=template, output_path=output, source_dir=source_dir)
+
+    assert output.exists()
+    assert frame.loc[0, "weight_class"] == "Lightweight"
+    assert frame.loc[0, "event_location"] == "Las Vegas, Nevada, USA"
+    assert frame.loc[0, "scheduled_rounds"] == 5
+    fight_source = next(source for source in report.external_sources if source.path.name == "Fights.csv")
+    assert fight_source.matched_rows == 1
+    assert "Weight_Class" in fight_source.columns
+    assert "weight_class" in fight_source.usable_fields
+
+
 def test_auto_enrich_does_not_overwrite_known_values_with_blanks(tmp_path) -> None:
     template = tmp_path / "fight_enrichment_template.csv"
     output = tmp_path / "fight_enrichment.csv"
@@ -304,6 +451,139 @@ def test_auto_enrich_does_not_overwrite_known_values_with_blanks(tmp_path) -> No
     assert frame.loc[0, "event_location"] == "Las Vegas"
 
 
+def test_auto_enrich_does_not_overwrite_known_values_with_unknown(tmp_path) -> None:
+    template = tmp_path / "fight_enrichment_template.csv"
+    output = tmp_path / "fight_enrichment.csv"
+    source_dir = tmp_path / "sources"
+    source_dir.mkdir()
+    pd.DataFrame(
+        [
+            {
+                "fight_date": "2020-01-01",
+                "event": "UFC Fight Night: Alpha vs. Beta",
+                "fighter_a": "Alice Alpha",
+                "fighter_b": "Beth Beta",
+                "weight_class": "Lightweight",
+                "event_location": "Las Vegas",
+                "main_event": 1,
+                "title_fight": 1,
+                "scheduled_rounds": 5,
+            }
+        ]
+    ).to_csv(template, index=False)
+    pd.DataFrame(
+        [
+            {
+                "event": "UFC Fight Night: Alpha vs. Beta",
+                "date": "2020-01-01",
+                "location": "",
+                "weight_class": "Unknown",
+                "bout": "Alice Alpha vs Beth Beta",
+            }
+        ]
+    ).to_csv(source_dir / "external.csv", index=False)
+
+    frame, _ = auto_enrich(template_path=template, output_path=output, source_dir=source_dir)
+
+    assert frame.loc[0, "weight_class"] == "Lightweight"
+    assert frame.loc[0, "event_location"] == "Las Vegas"
+
+
+def test_auto_enrich_uses_conservative_matching(tmp_path) -> None:
+    template = tmp_path / "fight_enrichment_template.csv"
+    output = tmp_path / "fight_enrichment.csv"
+    source_dir = tmp_path / "sources"
+    source_dir.mkdir()
+    pd.DataFrame(
+        [
+            {
+                "fight_date": "2020-01-01",
+                "event": "UFC Fight Night: Alpha vs. Beta",
+                "fighter_a": "Alice Alpha",
+                "fighter_b": "Beth Beta",
+                "weight_class": "Unknown",
+                "event_location": "",
+                "main_event": "",
+                "title_fight": "",
+                "scheduled_rounds": 3,
+            }
+        ]
+    ).to_csv(template, index=False)
+    pd.DataFrame(
+        [
+            {
+                "event": "Different Event",
+                "date": "2020-02-01",
+                "location": "Las Vegas",
+                "division": "Lightweight",
+                "bout": "Alice Alpha vs Beth Beta",
+            }
+        ]
+    ).to_csv(source_dir / "external.csv", index=False)
+
+    frame, report = auto_enrich(template_path=template, output_path=output, source_dir=source_dir)
+
+    assert frame.loc[0, "weight_class"] == "Unknown"
+    assert pd.isna(frame.loc[0, "event_location"]) or frame.loc[0, "event_location"] == ""
+    assert report.external_sources[0].matched_rows == 0
+    assert report.external_sources[0].unmatched_rows == 1
+
+
+def test_auto_enrich_verbose_prints_source_summary(tmp_path) -> None:
+    template = tmp_path / "fight_enrichment_template.csv"
+    output = tmp_path / "fight_enrichment.csv"
+    source_dir = tmp_path / "sources"
+    source_dir.mkdir()
+    pd.DataFrame(
+        [
+            {
+                "fight_date": "2020-01-01",
+                "event": "UFC Fight Night: Alpha vs. Beta",
+                "fighter_a": "Alice Alpha",
+                "fighter_b": "Beth Beta",
+                "weight_class": "Unknown",
+                "event_location": "",
+                "main_event": "",
+                "title_fight": "",
+                "scheduled_rounds": 3,
+            }
+        ]
+    ).to_csv(template, index=False)
+    pd.DataFrame(
+        [
+            {
+                "event": "UFC Fight Night: Alpha vs. Beta",
+                "date": "2020-01-01",
+                "location": "Las Vegas",
+                "division": "Lightweight",
+                "bout": "Alice Alpha vs Beth Beta",
+                "is_main_event": True,
+                "is_title_fight": False,
+            }
+        ]
+    ).to_csv(source_dir / "external.csv", index=False)
+
+    result = runner.invoke(
+        app,
+        [
+            "auto-enrich",
+            "--template-path",
+            str(template),
+            "--output-path",
+            str(output),
+            "--source-dir",
+            str(source_dir),
+            "--verbose",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Sources loaded: 1" in result.output
+    assert "columns: event, date, location, division, bout, is_main_event, is_title_fight" in result.output
+    assert "usable fields:" in result.output
+    assert "Final enrichment coverage:" in result.output
+
+
 def test_enrichment_summary_file_alias_works_on_fight_enrichment_csv(tmp_path) -> None:
     path = tmp_path / "fight_enrichment.csv"
     pd.DataFrame(
@@ -326,7 +606,7 @@ def test_enrichment_summary_file_alias_works_on_fight_enrichment_csv(tmp_path) -
 
     assert result.exit_code == 0
     assert "Total fights: 1" in result.output
-    assert "Known weight_class: 100.0%" in result.output
+    assert "Known weight_class: 1/1 (100.0%)" in result.output
 
 
 def test_import_enrichment_missing_file_error_points_to_template_workflow(tmp_path) -> None:
@@ -473,6 +753,52 @@ def test_report_data_quality_coverage_counts_enriched_fields_odds_and_scorecards
     assert coverage["known_main_event_pct"] == 100.0
     assert coverage["odds_coverage_pct"] == 50.0
     assert coverage["scorecard_coverage_pct"] == 50.0
+
+
+def test_report_data_quality_coverage_prefers_enriched_imports(tmp_path) -> None:
+    raw_dir = tmp_path / "raw"
+    imports_dir = raw_dir / "imports"
+    imports_dir.mkdir(parents=True)
+    stale = pd.DataFrame(
+        [
+            {
+                "fight_id": 1,
+                "event_name": "UFC Test 1",
+                "fight_date": "2020-01-01",
+                "fighter_a": "Alice Alpha",
+                "fighter_b": "Beth Beta",
+                "weight_class": "Unknown",
+                "event_location": "",
+                "main_event": "",
+                "title_fight": "",
+            }
+        ]
+    )
+    stale.to_csv(raw_dir / "fights.csv", index=False)
+    enriched = pd.DataFrame(
+        [
+            {
+                "fight_id": 1,
+                "event_name": "UFC Test 1",
+                "fight_date": "2020-01-01",
+                "fighter_a": "Alice Alpha",
+                "fighter_b": "Beth Beta",
+                "weight_class": "Lightweight",
+                "event_location": "Las Vegas",
+                "main_event": 1,
+                "title_fight": 1,
+            }
+        ]
+    )
+    enriched.to_csv(imports_dir / "fights.csv", index=False)
+
+    coverage = build_data_quality_coverage(raw_dir)
+
+    assert coverage["coverage_source"].endswith("imports\\fights.csv") or coverage["coverage_source"].endswith("imports/fights.csv")
+    assert coverage["known_weight_class_pct"] == 100.0
+    assert coverage["known_event_location_pct"] == 100.0
+    assert coverage["known_main_event_pct"] == 100.0
+    assert coverage["known_title_fight_pct"] == 100.0
 
 
 def test_rolling_backtest_keeps_enriched_metadata_for_breakdowns(monkeypatch) -> None:

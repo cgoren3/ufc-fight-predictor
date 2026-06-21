@@ -266,11 +266,26 @@ def enrichment_summary(
         _runtime_error(f"Could not summarize enrichment data:\n{exc}")
     _print(f"Enrichment source: {summary.path}")
     _print(f"Total fights: {summary.total_fights}")
-    _print(f"Known weight_class: {summary.known_weight_class_pct:.1f}%")
-    _print(f"Known event_location: {summary.known_event_location_pct:.1f}%")
-    _print(f"Known main_event: {summary.known_main_event_pct:.1f}%")
-    _print(f"Known title_fight: {summary.known_title_fight_pct:.1f}%")
-    _print(f"Known scheduled_rounds: {summary.known_scheduled_rounds_pct:.1f}%")
+    _print(
+        f"Known weight_class: {summary.known_weight_class_count}/{summary.total_fights} "
+        f"({summary.known_weight_class_pct:.1f}%)"
+    )
+    _print(
+        f"Known event_location: {summary.known_event_location_count}/{summary.total_fights} "
+        f"({summary.known_event_location_pct:.1f}%)"
+    )
+    _print(
+        f"Known main_event: {summary.known_main_event_count}/{summary.total_fights} "
+        f"({summary.known_main_event_pct:.1f}%)"
+    )
+    _print(
+        f"Known title_fight: {summary.known_title_fight_count}/{summary.total_fights} "
+        f"({summary.known_title_fight_pct:.1f}%)"
+    )
+    _print(
+        f"Known scheduled_rounds: {summary.known_scheduled_rounds_count}/{summary.total_fights} "
+        f"({summary.known_scheduled_rounds_pct:.1f}%)"
+    )
 
 
 @app.command("auto-enrich")
@@ -287,8 +302,9 @@ def auto_enrich(
         settings.raw_data_dir / "enrichment_sources",
         help="Optional directory of external enrichment CSV files.",
     ),
+    verbose: bool = typer.Option(False, "--verbose", help="Print source columns, usable fields, match counts, and final coverage."),
 ) -> None:
-    from ufc_predictor.enrichment import auto_enrich as run_auto_enrich
+    from ufc_predictor.enrichment import auto_enrich as run_auto_enrich, enrichment_summary_from_frame
 
     try:
         frame, report = run_auto_enrich(template_path=template_path, output_path=output_path, source_dir=source_dir)
@@ -301,8 +317,14 @@ def auto_enrich(
     _print(f"Inferred title_fight=0 rows: {report.inferred_non_title_fight_rows}")
     if report.external_sources:
         _print("External enrichment sources:")
+        if verbose:
+            _print(f"Sources loaded: {len(report.external_sources)}")
         for source in report.external_sources:
             _print(f"- {source.path.name}: rows={source.rows_read}, matched={source.matched_rows}, unmatched={source.unmatched_rows}")
+            if verbose:
+                _print(f"  path: {source.path}")
+                _print(f"  columns: {', '.join(source.columns) if source.columns else '(none)'}")
+                _print(f"  usable fields: {', '.join(source.usable_fields) if source.usable_fields else '(none)'}")
             for field, count in source.updated_fields.items():
                 if count:
                     _print(f"  {field}: {count}")
@@ -310,6 +332,17 @@ def auto_enrich(
                 _print(f"  [yellow]Warning: {warning}[/yellow]")
     else:
         _print(f"No external enrichment CSVs found under {source_dir}.")
+    if verbose:
+        summary = enrichment_summary_from_frame(frame, report.output_path)
+        _print("Final enrichment coverage:")
+        _print(f"- known weight_class: {summary.known_weight_class_count}/{summary.total_fights} ({summary.known_weight_class_pct:.1f}%)")
+        _print(f"- known event_location: {summary.known_event_location_count}/{summary.total_fights} ({summary.known_event_location_pct:.1f}%)")
+        _print(f"- known main_event: {summary.known_main_event_count}/{summary.total_fights} ({summary.known_main_event_pct:.1f}%)")
+        _print(f"- known title_fight: {summary.known_title_fight_count}/{summary.total_fights} ({summary.known_title_fight_pct:.1f}%)")
+        _print(
+            f"- known scheduled_rounds: {summary.known_scheduled_rounds_count}/{summary.total_fights} "
+            f"({summary.known_scheduled_rounds_pct:.1f}%)"
+        )
 
 
 @app.command("import-enrichment")
@@ -678,9 +711,24 @@ def report(
     coverage = payload.get("data_quality_coverage", {})
     if coverage:
         _print("Data quality coverage:")
-        _print(f"- known weight_class: {coverage.get('known_weight_class_pct', 0.0):.1f}%")
-        _print(f"- known event_location: {coverage.get('known_event_location_pct', 0.0):.1f}%")
-        _print(f"- known main_event: {coverage.get('known_main_event_pct', 0.0):.1f}%")
+        if coverage.get("coverage_source"):
+            _print(f"- source: {coverage.get('coverage_source')}")
+        _print(
+            f"- known weight_class: {coverage.get('known_weight_class_count', 0)}/{coverage.get('fights', 0)} "
+            f"({coverage.get('known_weight_class_pct', 0.0):.1f}%)"
+        )
+        _print(
+            f"- known event_location: {coverage.get('known_event_location_count', 0)}/{coverage.get('fights', 0)} "
+            f"({coverage.get('known_event_location_pct', 0.0):.1f}%)"
+        )
+        _print(
+            f"- known main_event: {coverage.get('known_main_event_count', 0)}/{coverage.get('fights', 0)} "
+            f"({coverage.get('known_main_event_pct', 0.0):.1f}%)"
+        )
+        _print(
+            f"- known title_fight: {coverage.get('known_title_fight_count', 0)}/{coverage.get('fights', 0)} "
+            f"({coverage.get('known_title_fight_pct', 0.0):.1f}%)"
+        )
         _print(f"- odds coverage: {coverage.get('odds_coverage_pct', 0.0):.1f}%")
         _print(f"- scorecard coverage: {coverage.get('scorecard_coverage_pct', 0.0):.1f}%")
     _print(f"Train accuracy: {train_metrics.get('accuracy')}")

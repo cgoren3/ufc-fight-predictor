@@ -22,3 +22,4 @@ data/processed/
 data/raw/source_metadata.json
 data/raw/imports/fight_enrichment_template.csv
 data/raw/imports/fight_enrichment.csv
+data/raw/enrichment_sources/

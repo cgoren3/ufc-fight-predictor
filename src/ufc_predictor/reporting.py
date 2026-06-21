@@ -58,11 +58,12 @@ def _known_main_event_mask(fights: pd.DataFrame) -> pd.Series:
     if fights.empty or "main_event" not in fights.columns:
         return pd.Series([False] * len(fights), index=fights.index)
     flags = pd.to_numeric(fights["main_event"], errors="coerce").fillna(0)
-    if "event_name" in fights.columns and "fight_date" in fights.columns:
+    event_column = "event_name" if "event_name" in fights.columns else "event" if "event" in fights.columns else ""
+    if event_column and "fight_date" in fights.columns:
         grouped = pd.DataFrame(
             {
                 "fight_date": pd.to_datetime(fights["fight_date"], errors="coerce").dt.date.astype("string"),
-                "event_name": fights["event_name"].fillna("").astype(str).str.strip().str.lower(),
+                "event_name": fights[event_column].fillna("").astype(str).str.strip().str.lower(),
                 "has_main_event": flags.eq(1),
             },
             index=fights.index,
@@ -70,6 +71,12 @@ def _known_main_event_mask(fights: pd.DataFrame) -> pd.Series:
         event_has_main = grouped.groupby(["fight_date", "event_name"])["has_main_event"].transform("any")
         return event_has_main.fillna(False).astype(bool)
     return flags.eq(1)
+
+
+def _known_binary_mask(series: pd.Series) -> pd.Series:
+    text = series.fillna("").astype(str).str.strip()
+    flags = pd.to_numeric(series, errors="coerce")
+    return text.ne("") & flags.isin([0, 1])
 
 
 def _odds_coverage(fights: pd.DataFrame, odds: pd.DataFrame | None) -> tuple[int, float]:
@@ -93,17 +100,53 @@ def _scorecard_coverage(fights: pd.DataFrame, scorecards: pd.DataFrame | None) -
     return count, _percent(count, len(fights))
 
 
+def _read_best_fights_for_coverage(raw: Path) -> tuple[pd.DataFrame | None, Path | None]:
+    candidates: list[tuple[Path, pd.DataFrame]] = []
+    for path in [raw / "fights.csv", raw / "imports" / "fights.csv", raw / "imports" / "fight_enrichment.csv"]:
+        fights = read_optional_csv(path, label="fights CSV")
+        if fights is not None and not fights.empty:
+            candidates.append((path, fights))
+    if not candidates:
+        return None, None
+
+    def main_event_count(frame: pd.DataFrame, path: Path) -> int:
+        if path.name == "fight_enrichment.csv":
+            return int(_known_binary_mask(frame.get("main_event", pd.Series(dtype=object))).sum())
+        return int(_known_main_event_mask(frame).sum())
+
+    def score(path: Path, frame: pd.DataFrame) -> tuple[int, int, int, int]:
+        known_weight = int(_known_text_mask(frame.get("weight_class", pd.Series(dtype=object))).sum())
+        known_location = int(_known_text_mask(frame.get("event_location", pd.Series(dtype=object))).sum())
+        known_main = main_event_count(frame, path)
+        return (known_weight + known_location + known_main, known_weight, known_location, len(frame))
+
+    path, fights = max(candidates, key=lambda candidate: score(candidate[0], candidate[1]))
+    return fights, path
+
+
+def _read_best_optional_csv(raw: Path, filename: str, label: str) -> pd.DataFrame | None:
+    direct = read_optional_csv(raw / filename, label=label)
+    if direct is not None and not direct.empty:
+        return direct
+    imported = read_optional_csv(raw / "imports" / filename, label=label)
+    if imported is not None and not imported.empty:
+        return imported
+    return direct if direct is not None else imported
+
+
 def build_data_quality_coverage(raw_dir: str | Path | None = None) -> dict[str, Any]:
     raw = Path(raw_dir) if raw_dir else settings.raw_data_dir
-    fights = read_optional_csv(raw / "fights.csv", label="fights CSV")
-    odds = read_optional_csv(raw / "odds.csv", label="odds CSV")
-    scorecards = read_optional_csv(raw / "scorecards.csv", label="scorecards CSV")
+    fights, fights_path = _read_best_fights_for_coverage(raw)
+    odds = _read_best_optional_csv(raw, "odds.csv", "odds CSV")
+    scorecards = _read_best_optional_csv(raw, "scorecards.csv", "scorecards CSV")
     if fights is None or fights.empty:
         return {
             "fights": 0,
+            "coverage_source": "",
             "known_weight_class_pct": 0.0,
             "known_event_location_pct": 0.0,
             "known_main_event_pct": 0.0,
+            "known_title_fight_pct": 0.0,
             "odds_coverage_pct": 0.0,
             "scorecard_coverage_pct": 0.0,
         }
@@ -111,17 +154,24 @@ def build_data_quality_coverage(raw_dir: str | Path | None = None) -> dict[str, 
     total = len(fights)
     known_weight = int(_known_text_mask(fights.get("weight_class", pd.Series(dtype=object))).sum())
     known_location = int(_known_text_mask(fights.get("event_location", pd.Series(dtype=object))).sum())
-    known_main = int(_known_main_event_mask(fights).sum())
+    if fights_path and fights_path.name == "fight_enrichment.csv":
+        known_main = int(_known_binary_mask(fights.get("main_event", pd.Series(dtype=object))).sum())
+    else:
+        known_main = int(_known_main_event_mask(fights).sum())
+    known_title = int(_known_binary_mask(fights.get("title_fight", pd.Series(dtype=object))).sum())
     odds_count, odds_pct = _odds_coverage(fights, odds)
     scorecard_count, scorecard_pct = _scorecard_coverage(fights, scorecards)
     return {
         "fights": int(total),
+        "coverage_source": str(fights_path) if fights_path else "",
         "known_weight_class_count": known_weight,
         "known_weight_class_pct": _percent(known_weight, total),
         "known_event_location_count": known_location,
         "known_event_location_pct": _percent(known_location, total),
         "known_main_event_count": known_main,
         "known_main_event_pct": _percent(known_main, total),
+        "known_title_fight_count": known_title,
+        "known_title_fight_pct": _percent(known_title, total),
         "odds_matched_fights": odds_count,
         "odds_coverage_pct": odds_pct,
         "scorecard_matched_fights": scorecard_count,
