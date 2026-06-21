@@ -91,16 +91,49 @@ def test_market_aware_rolling_backtest_records_past_blend_rows(monkeypatch) -> N
         [
             {"fight_date": "2019-01-01", "fighter_a_win": 1, "model_signal": 0.55, "market_fighter_a_implied_probability": 0.9},
             {"fight_date": "2019-06-01", "fighter_a_win": 0, "model_signal": 0.45, "market_fighter_a_implied_probability": 0.1},
-            {"fight_date": "2020-06-01", "fighter_a_win": 1, "model_signal": 0.6, "market_fighter_a_implied_probability": 0.2},
-            {"fight_date": "2021-06-01", "fighter_a_win": 0, "model_signal": 0.4, "market_fighter_a_implied_probability": 0.8},
+            {"fight_date": "2020-01-01", "fighter_a_win": 1, "model_signal": 0.01, "market_fighter_a_implied_probability": 0.9},
+            {"fight_date": "2020-06-01", "fighter_a_win": 0, "model_signal": 0.99, "market_fighter_a_implied_probability": 0.1},
+            {"fight_date": "2021-06-01", "fighter_a_win": 1, "model_signal": 0.4, "market_fighter_a_implied_probability": 0.8},
+            {"fight_date": "2022-06-01", "fighter_a_win": 0, "model_signal": 0.4, "market_fighter_a_implied_probability": np.nan},
         ]
     )
 
-    metrics = rolling_backtest(dataset, min_train_fights=2, model_mode="market-aware")
+    metrics = rolling_backtest(dataset, min_train_fights=2, model_mode="market-aware", min_blend_odds_rows=2)
     predictions = pd.DataFrame(metrics["predictions"])
+    changed = predictions[predictions["fight_date"].dt.year == 2021].iloc[0]
 
-    assert int(predictions.iloc[0]["blend_rows_used"]) == 2
-    assert predictions.iloc[0]["fight_date"].year == 2020
+    assert int(changed["blend_rows_used"]) == 2
+    assert changed["final_probability_used"] != changed["pure_model_probability"]
+    assert metrics["market_aware_probability_change"]["rows_changed"] > 0
+
+
+def test_market_aware_uses_pure_model_when_test_odds_do_not_exist(monkeypatch) -> None:
+    train_module = importlib.import_module("ufc_predictor.models.train")
+
+    class FakeBundle:
+        feature_columns = ["model_signal"]
+
+        def predict_proba(self, frame: pd.DataFrame) -> np.ndarray:
+            probs = frame["model_signal"].astype(float).to_numpy()
+            return np.column_stack([1.0 - probs, probs])
+
+    monkeypatch.setattr(train_module, "train_ensemble", lambda *args, **kwargs: FakeBundle())
+    dataset = pd.DataFrame(
+        [
+            {"fight_date": "2019-01-01", "fighter_a_win": 1, "model_signal": 0.55, "market_fighter_a_implied_probability": 0.9},
+            {"fight_date": "2019-06-01", "fighter_a_win": 0, "model_signal": 0.45, "market_fighter_a_implied_probability": 0.1},
+            {"fight_date": "2020-01-01", "fighter_a_win": 1, "model_signal": 0.01, "market_fighter_a_implied_probability": 0.9},
+            {"fight_date": "2020-06-01", "fighter_a_win": 0, "model_signal": 0.99, "market_fighter_a_implied_probability": 0.1},
+            {"fight_date": "2021-06-01", "fighter_a_win": 1, "model_signal": 0.6, "market_fighter_a_implied_probability": np.nan},
+            {"fight_date": "2022-06-01", "fighter_a_win": 0, "model_signal": 0.4, "market_fighter_a_implied_probability": np.nan},
+        ]
+    )
+
+    metrics = rolling_backtest(dataset, min_train_fights=2, model_mode="market-aware", min_blend_odds_rows=2)
+    predictions = pd.DataFrame(metrics["predictions"])
+    prediction = predictions[predictions["fight_date"].dt.year == 2021].iloc[0]
+
+    assert prediction["final_probability_used"] == prediction["pure_model_probability"]
 
 
 def test_scorecard_history_features_use_only_prior_fights() -> None:
@@ -187,6 +220,7 @@ def test_compare_model_modes_command_output(monkeypatch, tmp_path) -> None:
 
     assert result.exit_code == 0
     assert "Model mode comparison" in result.output
+    assert "odds-covered pure accuracy" in result.output
     assert json.loads(output.read_text(encoding="utf-8"))["market_aware_model"]["accuracy"] == 0.65
 
 
@@ -253,3 +287,89 @@ def test_apply_recency_weighting_duplicates_recent_training_rows() -> None:
     assert summary["enabled"]
     assert len(weighted) > len(frame)
     assert summary["max_weight"] == 3
+
+
+def test_predict_cli_accepts_manual_odds(monkeypatch, tmp_path) -> None:
+    predict_module = importlib.import_module("ufc_predictor.models.predict")
+    seen: dict = {}
+
+    def fake_predict_fight(**kwargs):
+        seen.update(kwargs)
+        return {
+            "fighter_a": kwargs["fighter_a"],
+            "fighter_b": kwargs["fighter_b"],
+            "market_implied_probability": 0.6923,
+            "odds_source": "manual_input",
+            "model_mode": "market_aware",
+        }
+
+    monkeypatch.setattr(predict_module, "predict_fight", fake_predict_fight)
+    result = runner.invoke(
+        app,
+        [
+            "predict",
+            "--fighter-a",
+            "A",
+            "--fighter-b",
+            "B",
+            "--date",
+            "2026-01-01",
+            "--weight-class",
+            "Lightweight",
+            "--scheduled-rounds",
+            "5",
+            "--model-mode",
+            "market-aware",
+            "--show-value-analysis",
+            "--fighter-a-odds",
+            "-250",
+            "--fighter-b-odds",
+            "200",
+            "--model-path",
+            str(tmp_path / "missing.pkl"),
+            "--fights-csv",
+            str(tmp_path / "missing_fights.csv"),
+            "--fight-stats-csv",
+            str(tmp_path / "missing_stats.csv"),
+            "--fighters-csv",
+            str(tmp_path / "missing_fighters.csv"),
+            "--scorecards-csv",
+            str(tmp_path / "missing_scorecards.csv"),
+            "--odds-csv",
+            str(tmp_path / "missing_odds.csv"),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert seen["odds"].loc[0, "source_file"] == "manual_input"
+    assert round(float(seen["odds"].loc[0, "fighter_a_no_vig_probability"]), 4) == 0.6818
+
+
+def test_extract_odds_summarizes_invalid_rows_without_warning_spam(tmp_path) -> None:
+    source = tmp_path / "sources"
+    source.mkdir()
+    pd.DataFrame(
+        [
+            {
+                "Fight Date": "2024-01-01",
+                "Red Fighter": "A",
+                "Blue Fighter": "B",
+                "Red Fighter Moneyline Odds": "bad",
+                "Blue Fighter Moneyline Odds": 150,
+            },
+            {
+                "Fight Date": "2024-01-02",
+                "Red Fighter": "C",
+                "Blue Fighter": "D",
+                "Red Fighter Moneyline Odds": "",
+                "Blue Fighter Moneyline Odds": "",
+            },
+        ]
+    ).to_csv(source / "ufc_fights.csv", index=False)
+
+    result = runner.invoke(app, ["extract-odds", "--source-dir", str(source), "--output-path", str(tmp_path / "odds.csv")])
+
+    assert result.exit_code == 1
+    assert "Invalid odds rows skipped: 1" in result.output
+    assert "Blank odds rows skipped: 1" in result.output
+    assert "Skipped invalid American odds" not in result.output

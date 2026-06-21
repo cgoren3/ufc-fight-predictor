@@ -30,6 +30,20 @@ def _clip_probs(y_prob: np.ndarray) -> np.ndarray:
     return np.clip(np.asarray(y_prob, dtype=float), 1e-6, 1.0 - 1e-6)
 
 
+def _accuracy(y_true: np.ndarray, y_prob: np.ndarray) -> float:
+    if len(y_true) == 0:
+        return float("nan")
+    return float(((_clip_probs(y_prob) >= 0.5).astype(int) == y_true.astype(int)).mean())
+
+
+def _log_loss(y_true: np.ndarray, y_prob: np.ndarray) -> float:
+    if len(y_true) == 0:
+        return float("nan")
+    prob = _clip_probs(y_prob)
+    target = y_true.astype(int)
+    return float(-(target * np.log(prob) + (1 - target) * np.log(1 - prob)).mean())
+
+
 def tune_market_blend_weight(
     y_true: np.ndarray | pd.Series | list[float],
     model_probability: np.ndarray | pd.Series | list[float],
@@ -72,6 +86,106 @@ def apply_market_blend(
     valid = ~np.isnan(market)
     blended[valid] = weight * model[valid] + (1.0 - weight) * market[valid]
     return _clip_probs(blended)
+
+
+def _fold_market_diagnostics(
+    *,
+    period_index: int,
+    start: pd.Timestamp,
+    end: pd.Timestamp,
+    train_rows: int,
+    test_rows: int,
+    train_market: pd.Series,
+    test_market: pd.Series,
+    target: pd.Series,
+    pure_probs: np.ndarray,
+    blended_probs: np.ndarray,
+    blend: dict[str, Any],
+    reason: str,
+) -> dict[str, Any]:
+    market = pd.to_numeric(test_market, errors="coerce")
+    valid = market.notna().to_numpy()
+    target_array = target.astype(int).to_numpy()
+    pure = np.asarray(pure_probs, dtype=float)
+    blended = np.asarray(blended_probs, dtype=float)
+    market_values = market.to_numpy(dtype=float)
+    probability_diff = np.abs(blended - pure)
+    diagnostics: dict[str, Any] = {
+        "period_index": period_index,
+        "fold_start": pd.Timestamp(start).date().isoformat(),
+        "fold_end": pd.Timestamp(end).date().isoformat(),
+        "train_rows": int(train_rows),
+        "test_rows": int(test_rows),
+        "training_rows_with_market_odds": int(pd.to_numeric(train_market, errors="coerce").notna().sum()),
+        "test_rows_with_market_odds": int(valid.sum()),
+        "learned_blend_weight": float(blend.get("weight", 1.0)),
+        "blend_rows_used": int(blend.get("rows_used", 0)),
+        "blend_validation_rows_used": int(blend.get("validation_rows_used", blend.get("rows_used", 0))),
+        "blend_validation_method": str(blend.get("validation_method", "")),
+        "blend_reason": reason,
+        "rows_where_market_aware_changed_probability": int((probability_diff > 1e-12).sum()),
+        "average_absolute_probability_change": float(probability_diff.mean()) if len(probability_diff) else float("nan"),
+    }
+    if valid.any():
+        diagnostics.update(
+            {
+                "pure_accuracy_on_odds_covered_test_rows": _accuracy(target_array[valid], pure[valid]),
+                "market_only_accuracy_on_odds_covered_test_rows": _accuracy(target_array[valid], market_values[valid]),
+                "blended_accuracy_on_odds_covered_test_rows": _accuracy(target_array[valid], blended[valid]),
+                "pure_log_loss_on_odds_covered_test_rows": _log_loss(target_array[valid], pure[valid]),
+                "market_log_loss_on_odds_covered_test_rows": _log_loss(target_array[valid], market_values[valid]),
+                "blended_log_loss_on_odds_covered_test_rows": _log_loss(target_array[valid], blended[valid]),
+            }
+        )
+    else:
+        diagnostics.update(
+            {
+                "pure_accuracy_on_odds_covered_test_rows": float("nan"),
+                "market_only_accuracy_on_odds_covered_test_rows": float("nan"),
+                "blended_accuracy_on_odds_covered_test_rows": float("nan"),
+                "pure_log_loss_on_odds_covered_test_rows": float("nan"),
+                "market_log_loss_on_odds_covered_test_rows": float("nan"),
+                "blended_log_loss_on_odds_covered_test_rows": float("nan"),
+            }
+        )
+    return diagnostics
+
+
+def _historical_market_validation_predictions(
+    train: pd.DataFrame,
+    train_ensemble_func: Callable[..., Any],
+    min_train_fights: int,
+    model_dir: str | Path | None = None,
+) -> tuple[pd.Series, np.ndarray, pd.Series]:
+    market = pd.to_numeric(train.get("market_fighter_a_implied_probability", pd.Series([np.nan] * len(train))), errors="coerce")
+    valid_market = market.notna()
+    if not valid_market.any():
+        return pd.Series(dtype=int), np.asarray([], dtype=float), pd.Series(dtype=float)
+    frame = train.copy()
+    frame["fight_date"] = pd.to_datetime(frame["fight_date"], errors="coerce")
+    market_rows = frame.loc[valid_market].copy()
+    years = sorted(market_rows["fight_date"].dt.year.dropna().astype(int).unique().tolist())
+    targets: list[pd.Series] = []
+    probabilities: list[np.ndarray] = []
+    markets: list[pd.Series] = []
+    for year in years:
+        start = pd.Timestamp(year=year, month=1, day=1)
+        end = pd.Timestamp(year=year + 1, month=1, day=1)
+        nested_train = frame[frame["fight_date"] < start]
+        validation = frame[(frame["fight_date"] >= start) & (frame["fight_date"] < end) & market.notna()]
+        if len(nested_train) < min_train_fights or validation.empty or nested_train["fighter_a_win"].nunique() < 2:
+            continue
+        nested_bundle = train_ensemble_func(nested_train, model_dir=model_dir, save=False, test_fraction=0.0)
+        probabilities.append(nested_bundle.predict_proba(validation[nested_bundle.feature_columns])[:, 1])
+        targets.append(validation["fighter_a_win"].astype(int))
+        markets.append(pd.to_numeric(validation["market_fighter_a_implied_probability"], errors="coerce"))
+    if not probabilities:
+        return pd.Series(dtype=int), np.asarray([], dtype=float), pd.Series(dtype=float)
+    return (
+        pd.concat(targets, ignore_index=True),
+        np.concatenate(probabilities),
+        pd.concat(markets, ignore_index=True),
+    )
 
 
 def evaluate_predictions(
@@ -232,6 +346,7 @@ def rolling_backtest(
     step: str = "YS",
     model_dir: str | Path | None = None,
     model_mode: str = "pure",
+    min_blend_odds_rows: int = 25,
     progress_callback: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
     """Train on fights before each period and predict the next period."""
@@ -248,6 +363,7 @@ def rolling_backtest(
     periods = pd.date_range(frame["fight_date"].min(), frame["fight_date"].max(), freq=step)
     period_pairs = list(zip(periods[:-1], periods[1:]))
     rows = []
+    fold_diagnostics: list[dict[str, Any]] = []
     skipped_periods = 0
     for index, (start, end) in enumerate(period_pairs, start=1):
         train = frame[frame["fight_date"] < start]
@@ -285,16 +401,54 @@ def rolling_backtest(
         test_market = pd.to_numeric(test.get("market_fighter_a_implied_probability", pd.Series([np.nan] * len(test))), errors="coerce")
         blend = {"weight": 1.0, "rows_used": 0, "best_log_loss": float("nan")}
         final_probs = pure_probs
+        blend_reason = "Pure model mode."
         if mode == "market-aware":
             valid_train_market = train_market.notna()
-            if valid_train_market.any():
-                train_probs = bundle.predict_proba(train.loc[valid_train_market, bundle.feature_columns])[:, 1]
-                blend = tune_market_blend_weight(
-                    train.loc[valid_train_market, "fighter_a_win"],
-                    train_probs,
-                    train_market.loc[valid_train_market],
+            train_market_rows = int(valid_train_market.sum())
+            if train_market_rows < min_blend_odds_rows:
+                blend_reason = f"Not enough historical odds rows before fold: {train_market_rows} < {min_blend_odds_rows}."
+            else:
+                validation_target, validation_probs, validation_market = _historical_market_validation_predictions(
+                    train,
+                    train_ensemble_func=train_ensemble,
+                    min_train_fights=min_train_fights,
+                    model_dir=model_dir,
                 )
+                if len(validation_target) < min_blend_odds_rows:
+                    blend_reason = (
+                        "Not enough past-only validation odds rows before fold: "
+                        f"{len(validation_target)} < {min_blend_odds_rows}."
+                    )
+                else:
+                    blend = tune_market_blend_weight(
+                        validation_target,
+                        validation_probs,
+                        validation_market,
+                    )
+                    blend["validation_rows_used"] = int(len(validation_target))
+                    blend["validation_method"] = "nested_past_year_validation"
+                    blend_reason = (
+                        "Learned blend from nested past-only validation odds rows."
+                        if float(blend.get("weight", 1.0)) < 1.0
+                        else "Nested validation selected pure model weight for this fold."
+                    )
             final_probs = apply_market_blend(pure_probs, test_market, blend["weight"])
+        fold_diagnostics.append(
+            _fold_market_diagnostics(
+                period_index=index,
+                start=start,
+                end=end,
+                train_rows=len(train),
+                test_rows=len(test),
+                train_market=train_market,
+                test_market=test_market,
+                target=test["fighter_a_win"],
+                pure_probs=pure_probs,
+                blended_probs=final_probs,
+                blend=blend,
+                reason=blend_reason,
+            )
+        )
         for (_, item), pure_prob, final_prob, market_prob in zip(test.iterrows(), pure_probs, final_probs, test_market):
             row = {
                 "fight_id": item.get("fight_id"),
@@ -335,6 +489,15 @@ def rolling_backtest(
     metrics = evaluate_predictions(predictions["target"], predictions["prob"], metadata=predictions)
     metrics["predictions"] = predictions.to_dict(orient="records")
     metrics["model_mode"] = mode
+    metrics["market_aware_fold_diagnostics"] = fold_diagnostics
+    metrics["market_aware_probability_change"] = {
+        "rows_changed": int(
+            (np.abs(predictions["final_probability_used"].astype(float) - predictions["pure_model_probability"].astype(float)) > 1e-12).sum()
+        ),
+        "average_absolute_difference": float(
+            np.abs(predictions["final_probability_used"].astype(float) - predictions["pure_model_probability"].astype(float)).mean()
+        ),
+    }
     metrics["backtest_summary"] = {
         "step": step,
         "periods": len(period_pairs),

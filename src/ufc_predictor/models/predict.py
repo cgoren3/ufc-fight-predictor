@@ -79,6 +79,7 @@ def format_prediction_output(
     edge_vs_market: float | None = None,
     value_label: str | None = None,
     show_value_analysis: bool = False,
+    odds_source: str | None = None,
 ) -> dict[str, Any]:
     prob_a, prob_b = normalize_probability_pair(fighter_a_win_probability)
     predicted_winner = fighter_a if prob_a >= prob_b else fighter_b
@@ -105,6 +106,8 @@ def format_prediction_output(
     }
     if market_implied_probability is not None:
         output["market_implied_probability"] = round(float(market_implied_probability), 4)
+        if odds_source:
+            output["odds_source"] = odds_source
     if blended_probability is not None:
         output["blended_probability"] = round(float(blended_probability), 4)
     if edge_vs_market is not None:
@@ -338,6 +341,7 @@ def predict_fight(
     if mode == "market-aware" and market_probability is not None:
         market_prob_a = float(market_probability["market_implied_probability"])
         edge_vs_market = prob_a - market_prob_a
+        odds_source = str(market_probability.get("source_file") or market_probability.get("sportsbook") or "")
         weight = 1.0
         if bundle is not None and hasattr(bundle, "metrics"):
             weight = float(getattr(bundle, "metrics", {}).get("market_blend", {}).get("weight", 1.0))
@@ -375,6 +379,7 @@ def predict_fight(
         edge_vs_market=edge_vs_market,
         value_label=value_label_for_edge(edge_vs_market),
         show_value_analysis=show_value_analysis,
+        odds_source=odds_source if mode == "market-aware" and market_probability is not None else None,
     )
 
 

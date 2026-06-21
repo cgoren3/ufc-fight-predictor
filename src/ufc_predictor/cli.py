@@ -502,6 +502,17 @@ def extract_odds(
         _print(f"- {path}")
     _print(f"Rows written: {report.rows_written}")
     _print(f"Skipped rows: {report.skipped_rows}")
+    _print(f"Blank odds rows skipped: {report.blank_odds_rows_skipped}")
+    _print(f"Rows with one side missing skipped: {report.one_side_missing_rows_skipped}")
+    _print(f"Invalid odds rows skipped: {report.invalid_odds_rows_skipped}")
+    if report.invalid_odds_examples:
+        _print("Invalid odds examples:")
+        for example in report.invalid_odds_examples[:5]:
+            _print(
+                "  "
+                f"{example.get('fight_date')} | {example.get('fighter_a')} vs {example.get('fighter_b')} | "
+                f"{example.get('fighter_a_odds')} / {example.get('fighter_b_odds')}"
+            )
     _print(f"Output path: {report.output_path}")
     for warning in report.warnings:
         _print(f"[yellow]Warning: {warning}[/yellow]")
@@ -883,6 +894,10 @@ def report(
             "- market-only accuracy on odds-covered fights: "
             f"{comparison.get('market_only_on_odds_covered_fights', {}).get('accuracy')}"
         )
+        probability_change = comparison.get("probability_change", {})
+        if probability_change:
+            _print(f"- market-aware changed rows: {probability_change.get('rows_changed')}")
+            _print(f"- average absolute probability difference: {probability_change.get('average_absolute_difference')}")
     model_vs_market = backtest_metrics.get("model_vs_market", {})
     if model_vs_market:
         _print("Model-vs-market analysis:")
@@ -971,35 +986,89 @@ def compare_model_modes(
 
     market_predictions = pd.DataFrame(market_aware.get("predictions", []))
     market_only: dict = {"count": 0.0}
-    odds_covered: dict = {}
-    non_odds: dict = {}
+    pure_odds_covered: dict = {}
+    market_aware_odds_covered: dict = {}
+    pure_non_odds: dict = {}
+    market_aware_non_odds: dict = {}
+    probability_change = {"rows_changed": 0, "average_absolute_difference": 0.0, "why_same_as_pure": ""}
     if not market_predictions.empty and "market_implied_probability" in market_predictions.columns:
         market_probs = pd.to_numeric(market_predictions["market_implied_probability"], errors="coerce")
+        pure_source = (
+            market_predictions["pure_model_probability"]
+            if "pure_model_probability" in market_predictions.columns
+            else market_predictions["model_probability"]
+            if "model_probability" in market_predictions.columns
+            else market_predictions["prob"]
+        )
+        final_source = (
+            market_predictions["final_probability_used"]
+            if "final_probability_used" in market_predictions.columns
+            else market_predictions["prob"]
+        )
+        pure_probs = pd.to_numeric(pure_source, errors="coerce")
+        final_probs = pd.to_numeric(final_source, errors="coerce")
         valid = market_probs.notna()
+        differences = (final_probs - pure_probs).abs()
+        probability_change = {
+            "rows_changed": int(differences.gt(1e-12).sum()),
+            "average_absolute_difference": float(differences.mean()) if len(differences) else 0.0,
+            "average_absolute_difference_on_odds_covered_rows": float(differences.loc[valid].mean()) if valid.any() else 0.0,
+            "why_same_as_pure": "",
+        }
+        if probability_change["rows_changed"] == 0:
+            diagnostics = market_aware.get("market_aware_fold_diagnostics", [])
+            reasons = sorted({str(item.get("blend_reason", "")) for item in diagnostics if item.get("blend_reason")})
+            probability_change["why_same_as_pure"] = "; ".join(reasons) or "No market-aware probability changes were produced."
         if valid.any():
             market_only = evaluate_predictions(
                 market_predictions.loc[valid, "target"],
                 market_probs.loc[valid],
                 metadata=market_predictions.loc[valid],
             )
-            odds_covered = evaluate_predictions(
+            pure_odds_covered = evaluate_predictions(
                 market_predictions.loc[valid, "target"],
-                market_predictions.loc[valid, "final_probability_used"],
+                pure_probs.loc[valid],
+                metadata=market_predictions.loc[valid],
+            )
+            market_aware_odds_covered = evaluate_predictions(
+                market_predictions.loc[valid, "target"],
+                final_probs.loc[valid],
                 metadata=market_predictions.loc[valid],
             )
         if (~valid).any():
-            non_odds = evaluate_predictions(
+            pure_non_odds = evaluate_predictions(
                 market_predictions.loc[~valid, "target"],
-                market_predictions.loc[~valid, "final_probability_used"],
+                pure_probs.loc[~valid],
+                metadata=market_predictions.loc[~valid],
+            )
+            market_aware_non_odds = evaluate_predictions(
+                market_predictions.loc[~valid, "target"],
+                final_probs.loc[~valid],
                 metadata=market_predictions.loc[~valid],
             )
 
     comparison = {
         "pure_model": _metrics_for_console(pure),
         "market_aware_model": _metrics_for_console(market_aware),
+        "all_rows": {
+            "pure_accuracy": pure.get("accuracy"),
+            "market_aware_accuracy": market_aware.get("accuracy"),
+            "pure_log_loss": pure.get("log_loss"),
+            "market_aware_log_loss": market_aware.get("log_loss"),
+        },
+        "odds_covered_rows": {
+            "pure": _metrics_for_console(pure_odds_covered),
+            "market_aware": _metrics_for_console(market_aware_odds_covered),
+            "market_only": _metrics_for_console(market_only),
+        },
+        "non_odds_rows": {
+            "pure": _metrics_for_console(pure_non_odds),
+            "market_aware": _metrics_for_console(market_aware_non_odds),
+        },
+        "probability_change": probability_change,
         "market_only_on_odds_covered_fights": _metrics_for_console(market_only),
-        "market_aware_on_odds_covered_fights": _metrics_for_console(odds_covered),
-        "market_aware_on_non_odds_fights": _metrics_for_console(non_odds),
+        "market_aware_on_odds_covered_fights": _metrics_for_console(market_aware_odds_covered),
+        "market_aware_on_non_odds_fights": _metrics_for_console(market_aware_non_odds),
         "note": "Market comparison is analytical only.",
     }
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -1007,8 +1076,18 @@ def compare_model_modes(
     _print("Model mode comparison")
     _print(f"- pure model accuracy: {pure.get('accuracy')}")
     _print(f"- market-aware model accuracy: {market_aware.get('accuracy')}")
-    _print(f"- market-only accuracy on odds-covered fights: {market_only.get('accuracy')}")
+    _print(f"- pure model log loss: {pure.get('log_loss')}")
     _print(f"- market-aware log loss: {market_aware.get('log_loss')}")
+    _print(f"- odds-covered pure accuracy: {pure_odds_covered.get('accuracy')}")
+    _print(f"- odds-covered market-aware accuracy: {market_aware_odds_covered.get('accuracy')}")
+    _print(f"- market-only accuracy on odds-covered fights: {market_only.get('accuracy')}")
+    _print(f"- market-only log loss on odds-covered fights: {market_only.get('log_loss')}")
+    _print(f"- non-odds pure accuracy: {pure_non_odds.get('accuracy')}")
+    _print(f"- non-odds market-aware accuracy: {market_aware_non_odds.get('accuracy')}")
+    _print(f"- rows where market-aware probability differed from pure: {probability_change.get('rows_changed')}")
+    _print(f"- average absolute probability difference: {probability_change.get('average_absolute_difference')}")
+    if probability_change.get("why_same_as_pure"):
+        _print(f"- why market-aware equals pure: {probability_change.get('why_same_as_pure')}")
     _print(f"- market-aware Brier score: {market_aware.get('brier_score')}")
     _print(f"- market-aware calibration error: {market_aware.get('expected_calibration_error')}")
     _print(f"Wrote model mode comparison to {output}")
@@ -1092,8 +1171,11 @@ def predict(
     fighters_csv: Path = typer.Option(settings.raw_data_dir / "fighters.csv", help="Optional fighters CSV."),
     scorecards_csv: Path = typer.Option(settings.raw_data_dir / "scorecards.csv", help="Optional scorecards CSV."),
     odds_csv: Path = typer.Option(settings.raw_data_dir / "odds.csv", help="Optional odds CSV for market-aware predictions."),
+    fighter_a_odds: Optional[int] = typer.Option(None, "--fighter-a-odds", help="Manual American odds for fighter A; not saved."),
+    fighter_b_odds: Optional[int] = typer.Option(None, "--fighter-b-odds", help="Manual American odds for fighter B; not saved."),
 ) -> None:
     from ufc_predictor.models.predict import predict_fight
+    from ufc_predictor.odds import american_odds_to_implied_probability, is_valid_american_odds
 
     fights = read_optional_csv(fights_csv, label="fights CSV")
     if fights is None:
@@ -1102,6 +1184,36 @@ def predict(
     fighters = read_optional_csv(fighters_csv, label="fighters CSV")
     scorecards = read_optional_csv(scorecards_csv, label="scorecards CSV")
     odds = read_optional_csv(odds_csv, label="odds CSV")
+    if (fighter_a_odds is None) != (fighter_b_odds is None):
+        _runtime_error("Provide both --fighter-a-odds and --fighter-b-odds, or omit both.")
+    if fighter_a_odds is not None and fighter_b_odds is not None:
+        if not is_valid_american_odds(fighter_a_odds) or not is_valid_american_odds(fighter_b_odds):
+            _runtime_error("Manual odds must be valid American odds, for example -250 and 200.")
+        implied_a = american_odds_to_implied_probability(fighter_a_odds)
+        implied_b = american_odds_to_implied_probability(fighter_b_odds)
+        probability_sum = float(implied_a or 0.0) + float(implied_b or 0.0)
+        if probability_sum <= 0:
+            _runtime_error("Manual odds could not be converted to implied probabilities.")
+        odds = pd.DataFrame(
+            [
+                {
+                    "fight_date": date,
+                    "event": "",
+                    "fighter_a": fighter_a,
+                    "fighter_b": fighter_b,
+                    "sportsbook": "manual_input",
+                    "fighter_a_odds": fighter_a_odds,
+                    "fighter_b_odds": fighter_b_odds,
+                    "timestamp": "",
+                    "source_file": "manual_input",
+                    "fighter_a_implied_probability": implied_a,
+                    "fighter_b_implied_probability": implied_b,
+                    "fighter_a_no_vig_probability": float(implied_a or 0.0) / probability_sum,
+                    "fighter_b_no_vig_probability": float(implied_b or 0.0) / probability_sum,
+                    "market_probability_sum": probability_sum,
+                }
+            ]
+        )
     model = model_path if model_path.exists() else None
     prediction = predict_fight(
         model=model,

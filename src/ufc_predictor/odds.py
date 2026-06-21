@@ -24,6 +24,15 @@ ODDS_COLUMNS = [
 ]
 
 
+NAME_ALIASES = {
+    "alex volkanovski": "alexander volkanovski",
+    "alexander volkanovski": "alexander volkanovski",
+    "jiri prochazka": "jiri prochazka",
+    "mark madsen": "mark madsen",
+    "mark o madsen": "mark madsen",
+}
+
+
 @dataclass
 class OddsCoverageReport:
     raw_odds_rows_found: int = 0
@@ -59,7 +68,17 @@ def _is_missing(value: Any) -> bool:
 def _normal(value: Any) -> str:
     if value is None or pd.isna(value):
         return ""
-    return " ".join(str(value).strip().split())
+    text = str(value).strip()
+    if any(marker in text for marker in ["Ã", "Å", "â"]):
+        for encoding in ["latin1", "cp1252"]:
+            try:
+                repaired = text.encode(encoding).decode("utf-8")
+            except (UnicodeEncodeError, UnicodeDecodeError):
+                continue
+            if repaired and repaired != text:
+                text = repaired
+                break
+    return " ".join(text.split())
 
 
 def _name_key(value: Any) -> str:
@@ -77,7 +96,8 @@ def _name_key(value: Any) -> str:
         if is_middle_initial:
             continue
         tokens.append(token)
-    return " ".join(tokens)
+    key = " ".join(tokens)
+    return NAME_ALIASES.get(key, key)
 
 
 def _pair_key_from_names(fighter_a: Any, fighter_b: Any) -> str:

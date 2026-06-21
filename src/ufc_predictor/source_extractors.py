@@ -40,6 +40,10 @@ class ExtractionReport:
     source_files_used: list[str] = field(default_factory=list)
     skipped_rows: int = 0
     warnings: list[str] = field(default_factory=list)
+    blank_odds_rows_skipped: int = 0
+    invalid_odds_rows_skipped: int = 0
+    one_side_missing_rows_skipped: int = 0
+    invalid_odds_examples: list[dict[str, Any]] = field(default_factory=list)
 
 
 def _canonical_columns(frame: pd.DataFrame) -> pd.DataFrame:
@@ -156,8 +160,10 @@ def extract_odds_from_sources(
     event_map = _build_event_map(paths)
     rows: list[dict[str, Any]] = []
     used: set[str] = set()
-    skipped = 0
-    warnings: list[str] = []
+    blank_skipped = 0
+    invalid_skipped = 0
+    one_side_missing = 0
+    invalid_examples: list[dict[str, Any]] = []
 
     for path in paths:
         frame = _read_source(path)
@@ -166,20 +172,37 @@ def extract_odds_from_sources(
         if not {"red_fighter_moneyline_odds", "blue_fighter_moneyline_odds"} <= set(frame.columns):
             continue
         for _, row in frame.iterrows():
-            red_odds = _odds_value(row.get("red_fighter_moneyline_odds"))
-            blue_odds = _odds_value(row.get("blue_fighter_moneyline_odds"))
-            if red_odds is None and blue_odds is None:
-                skipped += 1
+            raw_red_odds = row.get("red_fighter_moneyline_odds")
+            raw_blue_odds = row.get("blue_fighter_moneyline_odds")
+            red_odds = _odds_value(raw_red_odds)
+            blue_odds = _odds_value(raw_blue_odds)
+            red_blank = not _non_empty(raw_red_odds)
+            blue_blank = not _non_empty(raw_blue_odds)
+            if red_blank and blue_blank:
+                blank_skipped += 1
+                continue
+            if red_blank != blue_blank:
+                one_side_missing += 1
                 continue
             if not is_valid_american_odds(red_odds) or not is_valid_american_odds(blue_odds):
-                skipped += 1
-                warnings.append(f"Skipped invalid American odds in {path.name}.")
+                invalid_skipped += 1
+                if len(invalid_examples) < 10:
+                    invalid_examples.append(
+                        {
+                            "source_file": str(path),
+                            "fight_date": row.get("fight_date", ""),
+                            "fighter_a": row.get("red_fighter", ""),
+                            "fighter_b": row.get("blue_fighter", ""),
+                            "fighter_a_odds": raw_red_odds,
+                            "fighter_b_odds": raw_blue_odds,
+                        }
+                    )
                 continue
             fight_date = _source_fight_date(row, event_map)
             fighter_a = _clean(row.get("red_fighter"))
             fighter_b = _clean(row.get("blue_fighter"))
             if not fight_date or not fighter_a or not fighter_b:
-                skipped += 1
+                invalid_skipped += 1
                 continue
             rows.append(
                 {
@@ -204,8 +227,12 @@ def extract_odds_from_sources(
         rows_written=int(len(frame)),
         source_files_scanned=len(paths),
         source_files_used=sorted(used),
-        skipped_rows=skipped,
-        warnings=warnings[:10],
+        skipped_rows=blank_skipped + invalid_skipped + one_side_missing,
+        warnings=[],
+        blank_odds_rows_skipped=blank_skipped,
+        invalid_odds_rows_skipped=invalid_skipped,
+        one_side_missing_rows_skipped=one_side_missing,
+        invalid_odds_examples=invalid_examples,
     )
     return frame, report
 
