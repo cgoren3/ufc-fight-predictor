@@ -1,0 +1,823 @@
+Event Id,Event Name,Event Date,Event Venue Name,Event Venue Address,Event Venue City,Event Venue State,Event Venue Country,# Of Matches
+400255729,UFC 1: The Beginning,1993-11-13T02:00Z,McNichols Sports Arena,,Denver,CO,USA,8
+400255726,UFC 2: No Way Out,1994-03-12T02:00Z,Fillmore Auditorium,,Denver,CO,USA,15
+400255721,UFC 3: The American Dream,1994-09-10T01:00Z,Grady Cole Center,,Charlotte,NC,USA,6
+400255719,UFC 4: Revenge of the Warriors,1994-12-17T02:00Z,Expo Square Pavilion,,Tulsa,OK,USA,10
+400255714,UFC 5: Return of the Beast,1995-04-08T01:00Z,Bojangles Coliseum,2700 East Independence Blvd.,Charlotte,NC,USA,10
+400255710,UFC 7: The Brawl in Buffalo,1995-09-09T01:00Z,Buffalo Memorial Auditorium,,Buffalo,NY,USA,11
+400255707,UFC: Ultimate Ultimate 95,1995-12-17T02:00Z,Fillmore Auditorium,,Denver,CO,USA,9
+400255705,UFC 8: David vs. Goliath,1996-02-17T02:00Z,Ruben Rodriguez Coliseum,,San Juan,,Puerto Rico,9
+400255701,UFC 9: Motor City Madness,1996-05-18T01:00Z,Cobo Center,,Detroit,MI,USA,7
+400255697,UFC 10: The Tournament,1996-07-13T01:00Z,Fair Park Arena,2331 BESSEMER ROAD,Birmingham,AL,USA,9
+400255678,UFC 13: The Ultimate Force,1997-05-31T01:00Z,Augusta Civic Center,,Augusta,GA,,9
+400255669,UFC 14:  Showdown,1997-07-28T01:00Z,Boutwell Auditorium,,Birmingham,AL,USA,9
+400255653,UFC 15: Collision Course,1997-10-18T01:00Z,Casino Magic,,Bay Saint Louis,MS,USA,7
+400255645,UFC - Ultimate Japan,1997-12-22T02:00Z,Yokohama Arena,,Yokohama,,Japan,7
+400255629,UFC 17: Redemption,1998-05-16T01:00Z,Mobile Civic Center,401 CIVIC CENTER DRIVE,Mobile,AL,,9
+400255609,UFC 17.5: Ultimate Brazil,1998-10-17T01:00Z,Portuguesa Gymnasium,,Sao Paulo,,Brazil,8
+400255591,UFC 18: The Road to the Heavyweight Title,1999-01-09T02:00Z,Pontchartrain Center,,New Orleans,LA,USA,7
+400255576,UFC 19: Ultimate Young Guns,1999-03-06T02:00Z,Casino Magic,,Bay Saint Louis,MS,USA,7
+400255552,UFC 20: Battle for the Gold,1999-05-08T01:00Z,Boutwell Auditorium,,Birmingham,AL,USA,7
+400255529,UFC 21: Return of the Champions,1999-07-17T01:00Z,U.S. Cellular Center (IA),,Cedar Rapids,IA,USA,8
+400255511,UFC 22: There Can Be Only One Champion,1999-09-25T01:00Z,Sudduth Coliseum,,Lake Charles,LA,USA,8
+400255493,UFC 23: Ultimate Japan 2,1999-11-20T02:00Z,Tokyo Bay NK Hall,,Chiba,,Japan,7
+400255459,UFC 24: First Defense,2000-03-11T02:00Z,Sudduth Coliseum,,Lake Charles,LA,USA,7
+400255445,UFC 25: Ultimate Japan 3,2000-04-15T01:00Z,Yoyogi National Gymnasium,,Tokyo,,Japan,6
+400255423,UFC 26: Ultimate Field of Dreams,2000-06-10T01:00Z,Five Seasons Events Center,,Cedar Rapids,IA,USA,8
+400255377,UFC 27: Ultimate Bad Boyz,2000-09-23T01:00Z,,,,,,8
+400255359,UFC 28: High Stakes,2000-11-18T02:00Z,Etess Arena,,Atlantic City,NJ,USA,7
+400255343,UFC 29: Defense of the Belts,2000-12-17T02:00Z,Differ Ariake,,Tokyo,,Japan,7
+400255324,UFC 30: The Battle on the Boardwalk,2001-02-24T02:00Z,Etess Arena,,Atlantic City,NJ,USA,8
+400255284,UFC 31: Locked & Loaded,2001-05-05T01:00Z,Etess Arena,,Atlantic City,NJ,USA,8
+400255263,UFC 32: Showdown in the Meadowlands,2001-06-30T01:00Z,Izod Center,,East Rutherford,NJ,USA,8
+400255224,UFC 33: Victory in Vegas,2001-09-29T01:00Z,Mandalay Bay,,Las Vegas,NV,USA,8
+400255208,UFC 34: High Voltage,2001-11-03T02:00Z,MGM Grand,,Las Vegas,NV,USA,8
+400255174,UFC 35: Throwdown,2002-01-12T02:00Z,Mohegan Sun Arena,,Uncasville,CT,USA,8
+400255147,UFC 36: Worlds Collide,2002-03-23T02:00Z,MGM Grand,,Las Vegas,NV,USA,8
+400255123,UFC 37: High Impact,2002-05-11T01:00Z,CenturyTel Center,,Bossier City,LA,USA,8
+400255100,UFC 37.5: As Real As It Gets,2002-06-23T01:00Z,Bellagio Hotel & Casino,,Las Vegas,NV,USA,6
+400255089,UFC 38: Brawl at the Hall,2002-07-14T01:00Z,Royal Albert Hall,,London,,England,7
+400255053,UFC 39: The Warriors Return,2002-09-28T01:00Z,Mohegan Sun Arena,,Uncasville,CT,USA,8
+400255022,UFC 40: Vendetta,2002-11-23T02:00Z,MGM Grand,,Las Vegas,NV,USA,8
+400254969,UFC 41: Onslaught,2003-03-01T02:00Z,Jim Whelan Boardwalk Hall,2301 Boardwalk,Atlantic City,NJ,USA,8
+400254929,UFC 42: Sudden Impact,2003-04-26T01:00Z,Kaseya Center,"AMERICAN AIRLINES ARENA,  601 BISCAYNE BLVD.",Miami,FL,USA,8
+400254903,UFC 43: Meltdown,2003-06-07T01:00Z,,,,,,8
+400254829,UFC 44: Undisputed,2003-09-27T01:00Z,Mandalay Bay,,Las Vegas,NV,USA,9
+400254794,UFC 45: Revolution,2003-11-22T02:00Z,Mohegan Sun Arena,,Uncasville,CT,USA,8
+400254744,UFC 46: Supernatural,2004-02-01T02:00Z,Mandalay Bay,,Las Vegas,NV,USA,8
+400254696,UFC 47: It's On,2004-04-03T02:00Z,Mandalay Bay,,Las Vegas,NV,USA,8
+400254626,UFC 48: Payback,2004-06-20T01:00Z,Mandalay Bay,,Las Vegas,NV,USA,8
+400254525,UFC 50: The War of '04,2004-10-23T01:00Z,Jim Whelan Boardwalk Hall,2301 Boardwalk,Atlantic City,NJ,USA,7
+400254447,UFC 51: Super Saturday,2005-02-06T02:00Z,Mandalay Bay,,Las Vegas,NV,USA,9
+400254386,The Ultimate Fighter 1 Finale,2005-04-10T01:00Z,Cox Pavilion,,Las Vegas,NV,USA,9
+400254377,UFC 52: Couture vs. Liddell 2,2005-04-17T01:00Z,MGM Grand,,Las Vegas,NV,USA,8
+400254327,UFC 53: Heavy Hitters,2005-06-05T01:00Z,Jim Whelan Boardwalk Hall,2301 Boardwalk,Atlantic City,NJ,USA,8
+400254263,UFC Fight Night 1,2005-08-07T01:00Z,Cox Pavilion,,Las Vegas,NV,USA,8
+400254255,UFC 54: Boiling Point,2005-08-21T01:00Z,MGM Grand,,Las Vegas,NV,USA,8
+400254204,UFC Fight Night 2,2005-10-04T01:00Z,The Joint at Hard Rock Hotel & Casino (Las Vegas),,Las Vegas,NV,USA,7
+400254203,UFC 55: Fury,2005-10-08T01:00Z,Mohegan Sun Arena,,Uncasville,CT,USA,8
+400254173,The Ultimate Fighter 2 Finale,2005-11-06T02:00Z,The Joint at Hard Rock Hotel & Casino (Las Vegas),,Las Vegas,NV,USA,7
+400254160,UFC 56: Full Force,2005-11-20T02:00Z,MGM Grand,,Las Vegas,NV,USA,8
+400254102,UFC Fight Night 3,2006-01-17T02:00Z,The Joint at Hard Rock Hotel & Casino (Las Vegas),,Las Vegas,NV,USA,8
+400254090,UFC 57: Liddell vs. Couture 3,2006-02-05T02:00Z,Mandalay Bay,,Las Vegas,NV,USA,9
+400254052,UFC 58: USA vs. Canada,2006-03-05T02:00Z,Mandalay Bay,,Las Vegas,NV,USA,8
+400254010,UFC Fight Night 4,2006-04-07T01:00Z,The Joint at Hard Rock Hotel & Casino (Las Vegas),,Las Vegas,NV,USA,9
+400253995,UFC 59: Reality Check,2006-04-16T01:00Z,Honda Center,2695 East Katella Ave.,Anaheim,CA,USA,9
+400253940,UFC 60: Hughes vs. Gracie,2006-05-28T01:00Z,crypto.com Arena,"STAPLES CENTER,  1111 S. FIGUE",Los Angeles,CA,USA,9
+400253907,The Ultimate Fighter 3 Finale,2006-06-25T01:00Z,The Joint at Hard Rock Hotel & Casino (Las Vegas),,Las Vegas,NV,USA,9
+400253904,UFC Fight Night 5,2006-06-29T01:00Z,The Joint at Hard Rock Hotel & Casino (Las Vegas),,Las Vegas,NV,USA,9
+400253893,UFC 61: Bitter Rivals,2006-07-09T01:00Z,Mandalay Bay,,Las Vegas,NV,USA,9
+400253844,UFC Fight Night 6,2006-08-18T01:00Z,Red Rock Hotel & Casino,,Las Vegas,NV,USA,9
+400253830,UFC 62: Liddell vs. Sobral,2006-08-27T01:00Z,Mandalay Bay,,Las Vegas,NV,USA,9
+400253794,UFC 63: Hughes vs. Penn,2006-09-24T01:00Z,Honda Center,2695 East Katella Ave.,Anaheim,CA,USA,9
+400253768,UFC Ortiz vs. Shamrock 3: The Final Chapter,2006-10-11T01:00Z,Seminole Hard Rock Hotel and Casino,,Hollywood,FL,USA,9
+400253761,UFC 64: Unstoppable,2006-10-15T01:00Z,Mandalay Bay,,Las Vegas,NV,USA,8
+400253716,The Ultimate Fighter 4 Finale,2006-11-12T02:00Z,The Joint at Hard Rock Hotel & Casino (Las Vegas),,Las Vegas,NV,USA,8
+400253705,UFC 65: Bad Intentions,2006-11-19T02:00Z,Sleep Train Arena,,Sacramento,CA,USA,9
+400253667,UFC Fight Night: Sanchez vs. Riggs,2006-12-14T02:00Z,Marine Corps Air Station Miramar,,San Diego,CA,USA,9
+400253658,UFC 66: Liddell vs. Ortiz 2,2006-12-31T02:00Z,MGM Grand,,Las Vegas,NV,USA,9
+400253642,UFC Fight Night: Evans vs Salmon,2007-01-26T02:00Z,Seminole Hard Rock Hotel and Casino,,Hollywood,FL,USA,8
+400253629,UFC 67: All or Nothing,2007-02-04T02:00Z,Mandalay Bay,,Las Vegas,NV,USA,9
+400253598,UFC 68: The Uprising,2007-03-04T02:00Z,Nationwide Arena,"200 WEST NATIONWIDE BLVD.,",Columbus,OH,USA,9
+400253549,UFC Fight Night: Stevenson vs. Guillard,2007-04-06T01:00Z,Pearl at the Palms,,Las Vegas,NV,USA,9
+400253544,UFC 69: Shootout,2007-04-08T01:00Z,Toyota Center (Houston),1510 POLK STREET,Houston,TX,USA,9
+400253525,UFC 70: Nations Collide,2007-04-22T01:00Z,Manchester Arena,,Manchester,,England,10
+400253468,UFC 71: Liddell vs. Jackson,2007-05-27T01:00Z,MGM Grand,,Las Vegas,NV,USA,9
+400253440,UFC Fight Night: Stout vs. Fisher,2007-06-13T01:00Z,Seminole Hard Rock Hotel and Casino,,Hollywood,FL,USA,9
+400253437,UFC 72: Victory,2007-06-17T01:00Z,Odyssey Arena,,Belfast,,Ireland,8
+400253426,The Ultimate Fighter 5 Finale,2007-06-24T01:00Z,Pearl at the Palms,,Las Vegas,NV,USA,9
+400253410,UFC 73: Stacked,2007-07-08T01:00Z,Sleep Train Arena,,Sacramento,CA,USA,9
+400253356,UFC 74: Respect,2007-08-26T01:00Z,Mandalay Bay,,Las Vegas,NV,USA,9
+400253344,UFC 75: Champion vs. Champion,2007-09-09T01:00Z,O2 Arena (ENG),,London,,England,9
+400253331,UFC Fight Night: Thomas vs. Florian,2007-09-20T01:00Z,Pearl at the Palms,,Las Vegas,NV,USA,9
+400253326,UFC 76: Knockout,2007-09-23T01:00Z,Honda Center,2695 East Katella Ave.,Anaheim,CA,USA,9
+400253284,UFC 77: Hostile Territory,2007-10-21T01:00Z,US Bank Arena,,Cincinnati,OH,USA,9
+400253246,UFC 78: Validation,2007-11-18T02:00Z,Prudential Center,165 MULBERRY STREET,Newark,NJ,USA,9
+400253208,The Ultimate Fighter 6 Finale,2007-12-09T02:00Z,Pearl at the Palms,,Las Vegas,NV,USA,9
+400253184,UFC 79: Nemesis,2007-12-30T02:00Z,Mandalay Bay,,Las Vegas,NV,USA,10
+400253172,UFC 80: Rapid Fire,2008-01-20T02:00Z,Metro Radio Arena,,Newcastle upon Tyne,,England,9
+400253169,UFC Fight Night: Swick vs Burkman,2008-01-24T02:00Z,Pearl at the Palms,,Las Vegas,NV,USA,9
+400253152,UFC 81: Breaking Point,2008-02-03T02:00Z,MGM Grand,,Las Vegas,NV,USA,9
+400253127,UFC 82: Pride of a Champion,2008-03-02T02:00Z,Nationwide Arena,"200 WEST NATIONWIDE BLVD.,",Columbus,OH,USA,10
+400253084,UFC Fight Night: Florian vs. Lauzon,2008-04-03T01:00Z,1stBank Center,11450 Broomfield Lane,Broomfield,CO,USA,12
+400253059,UFC 83: Serra vs. St-Pierre 2,2008-04-20T01:00Z,Bell Centre,"BELL CENTRE,  1260 RUE DE LA",Montreal,PQ,Canada,11
+400253007,UFC 84: Ill Will,2008-05-25T01:00Z,MGM Grand,,Las Vegas,NV,USA,11
+400252989,UFC 85: Bedlam,2008-06-08T01:00Z,O2 Arena (ENG),,London,,England,11
+400252973,The Ultimate Fighter 7 Finale,2008-06-22T01:00Z,Pearl at the Palms,,Las Vegas,NV,USA,10
+400252959,UFC 86: Jackson vs. Griffin,2008-07-06T01:00Z,Mandalay Bay,,Las Vegas,NV,USA,9
+400252944,UFC Fight Night: Silva vs. Irvin,2008-07-20T01:00Z,Pearl at the Palms,,Las Vegas,NV,USA,11
+400252922,UFC 87: Seek and Destroy,2008-08-10T01:00Z,Target Center,"TARGET CENTER,  600 FIRST AVE. NORTH",Minneapolis,MN,USA,10
+400252900,UFC 88: Breakthrough,2008-09-07T01:00Z,State Farm Arena,1 Philips Drive,Atlanta,GA,USA,9
+400252886,UFC Fight Night: Diaz vs. Neer,2008-09-18T01:00Z,Omaha Civic Auditorium,,Omaha,NE,USA,10
+400252845,UFC 89: Bisping vs. Leben,2008-10-19T01:00Z,Barclaycard Arena,,Birmingham,,England,11
+400252841,UFC 90: Silva vs. Cote,2008-10-26T01:00Z,Allstate Arena,2301 RAVINE WAY,Rosemont,IL,USA,10
+400252817,UFC 91: Couture vs. Lesnar,2008-11-16T02:00Z,MGM Grand,,Las Vegas,NV,USA,9
+400252781,UFC Fight Night: Fight for the Troops,2008-12-11T02:00Z,Crown Coliseum,,Fayetteville,NC,USA,10
+400252776,The Ultimate Fighter 8 Finale,2008-12-14T02:00Z,Pearl at the Palms,,Las Vegas,NV,USA,10
+400252765,UFC 92: The Ultimate 2008,2008-12-28T02:00Z,MGM Grand,,Las Vegas,NV,USA,10
+400252754,UFC 93: Franklin vs. Henderson,2009-01-18T02:00Z,3Arena,,Dublin,,Ireland,10
+400252738,UFC 94: St-Pierre vs. Penn 2,2009-02-01T02:00Z,MGM Grand,,Las Vegas,NV,USA,10
+400252730,UFC Fight Night: Lauzon vs. Stephens,2009-02-08T02:00Z,Yuengling Center,,Tampa,FL,USA,10
+400252716,UFC 95: Sanchez vs. Stevenson,2009-02-22T02:00Z,O2 Arena (ENG),,London,,England,10
+400252704,UFC 96: Jackson vs. Jardine,2009-03-08T02:00Z,Nationwide Arena,"200 WEST NATIONWIDE BLVD.,",Columbus,OH,USA,10
+400252671,UFC Fight Night: Condit vs. Kampmann,2009-04-02T01:00Z,Bridgestone Arena,501 Broadway,Nashville,TN,USA,11
+400252645,UFC 97: Redemption,2009-04-19T01:00Z,Bell Centre,"BELL CENTRE,  1260 RUE DE LA",Montreal,PQ,Canada,12
+400252596,UFC 98: Evans vs. Machida,2009-05-24T01:00Z,MGM Grand,,Las Vegas,NV,USA,11
+400252570,UFC 99: The Comeback,2009-06-13T04:00Z,Lanxess Arena,,Cologne,,Germany,12
+400252563,The Ultimate Fighter 9 Finale,2009-06-21T01:00Z,Pearl at the Palms,,Las Vegas,NV,USA,10
+400252542,UFC 100: Lesnar vs. Mir 2,2009-07-12T01:00Z,Mandalay Bay,,Las Vegas,NV,USA,11
+400252521,UFC 101: Declaration,2009-08-09T01:00Z,Wells Fargo Center,3601 Broad Street,Philadelphia,PA,USA,11
+400252496,UFC 102: Couture vs. Nogueira,2009-08-30T01:00Z,Rose Garden,,Portland,OR,USA,11
+400252480,UFC Fight Night: Diaz vs. Guillard,2009-09-17T01:00Z,Cox Convention Center,1 Myriad Gardens,Oklahoma City,OK,USA,10
+400252474,UFC 103: Franklin vs. Belfort,2009-09-20T01:00Z,American Airlines Center,,Dallas,TX,USA,13
+400252438,UFC 104: Machida vs. Shogun,2009-10-25T01:00Z,crypto.com Arena,"STAPLES CENTER,  1111 S. FIGUE",Los Angeles,CA,USA,11
+400252410,UFC 105: Couture vs. Vera,2009-11-15T02:00Z,Manchester Arena,,Manchester,,England,11
+400252394,UFC 106: Ortiz vs. Griffin 2,2009-11-22T02:00Z,Mandalay Bay,,Las Vegas,NV,USA,10
+400252380,The Ultimate Fighter 10 Finale,2009-12-06T02:00Z,Pearl at the Palms,,Las Vegas,NV,USA,10
+400252372,UFC 107: Penn vs. Sanchez,2009-12-13T02:00Z,FedExForum,LINDEN AVE. (BET 3RD & 4TH ST),Memphis,TN,USA,11
+400252360,UFC 108: Evans vs. Silva,2010-01-03T02:00Z,MGM Grand,,Las Vegas,NV,USA,10
+400252355,UFC Fight Night: Maynard vs. Diaz,2010-01-12T02:00Z,EagleBank Arena,,Fairfax,VA,,11
+400252334,UFC 109: Relentless,2010-02-07T02:00Z,Mandalay Bay,,Las Vegas,NV,USA,11
+400252325,UFC 110: Nogueira vs. Velasquez,2010-02-21T02:00Z,Allphones Arena,,Sydney,NSW,Australia,9
+400252285,UFC on Versus: Vera vs. Jones,2010-03-22T01:00Z,1stBank Center,11450 Broomfield Lane,Broomfield,CO,USA,11
+400252279,UFC 111: St-Pierre vs. Hardy,2010-03-28T01:00Z,Prudential Center,165 MULBERRY STREET,Newark,NJ,USA,10
+400252276,UFC Fight Night: Florian vs. Gomi,2010-04-01T01:00Z,Bojangles Coliseum,2700 East Independence Blvd.,Charlotte,NC,USA,11
+400252266,UFC 112: Invincible,2010-04-11T01:00Z,Ferrari World Concert Arena,,Abu Dhabi,,United Arab Emirates,10
+400252239,UFC 113: Machida vs. Shogun 2,2010-05-09T01:00Z,Bell Centre,"BELL CENTRE,  1260 RUE DE LA",Montreal,PQ,Canada,11
+400252217,UFC 114: Rampage vs. Evans,2010-05-30T01:00Z,MGM Grand,,Las Vegas,NV,USA,11
+400252205,UFC 115: Liddell vs. Franklin,2010-06-13T01:00Z,Rogers Arena,"GENERAL MOTORS PLACE,  800 GRI",Vancouver,BC,Canada,11
+400252196,The Ultimate Fighter 11 Finale,2010-06-20T01:00Z,Pearl at the Palms,,Las Vegas,NV,USA,10
+400252182,UFC 116: Lesnar vs. Carwin,2010-07-04T01:00Z,MGM Grand,,Las Vegas,NV,USA,11
+400252163,UFC on Versus: Jones vs. Matyushenko,2010-08-02T01:00Z,Pechanga Arena,3500 Sports Arena Boulevard,San Diego,CA,USA,10
+400252160,UFC 117: Silva vs. Sonnen,2010-08-08T01:00Z,Oracle Arena,,Oakland,CA,USA,11
+400252141,UFC 118: Edgar vs. Penn 2,2010-08-29T01:00Z,TD Garden,ONE TD BANKNORTH GARDEN PL.,Boston,MA,USA,10
+400252125,UFC Fight Night: Marquardt vs. Palhares,2010-09-16T01:00Z,Frank Erwin Center,,Austin,TX,USA,10
+400252117,UFC 119: Mir vs. Cro Cop,2010-09-26T01:00Z,Bankers Life Fieldhouse,"ONE CONSECO COURT,  125 S. PENNSYLVANIA ST.",Indianapolis,IN,USA,11
+400252099,UFC 120: Bisping vs. Akiyama,2010-10-17T01:00Z,O2 Arena (ENG),,London,,England,10
+400252093,UFC 121: Lesnar vs. Velasquez,2010-10-24T01:00Z,Honda Center,2695 East Katella Ave.,Anaheim,CA,USA,11
+400252074,UFC 122: Marquardt vs. Okami,2010-11-14T02:00Z,Konig Pilsener Arena,,Oberhausen,,Germany,10
+400252069,UFC 123: Rampage vs. Machida,2010-11-21T02:00Z,The Palace of Auburn Hills,6 Championship Drive,Auburn Hills,MI,USA,11
+400252061,The Ultimate Fighter 12 Finale,2010-12-05T02:00Z,Pearl at the Palms,,Las Vegas,NV,USA,11
+400252051,UFC 124: St-Pierre vs. Koscheck 2,2010-12-12T02:00Z,Bell Centre,"BELL CENTRE,  1260 RUE DE LA",Montreal,PQ,Canada,11
+400252043,UFC 125: Resolution,2011-01-02T02:00Z,MGM Grand,,Las Vegas,NV,USA,11
+400252037,UFC Fight Night: Fight for the Troops 2,2011-01-23T02:00Z,Fort Hood,,Killeen,TX,USA,11
+400252023,UFC 126: Silva vs. Belfort,2011-02-06T02:00Z,Mandalay Bay,,Las Vegas,NV,USA,11
+400252013,UFC 127: Penn vs. Fitch,2011-02-27T02:00Z,Allphones Arena,,Sydney,NSW,Australia,12
+400252010,UFC on Versus: Sanchez vs. Kampmann,2011-03-04T02:00Z,KFC Yum! Center,1 ARENA PLAZA,Louisville,KY,USA,11
+400251999,UFC 128: Shogun vs. Jones,2011-03-20T01:00Z,Prudential Center,165 MULBERRY STREET,Newark,NJ,USA,12
+400251993,UFC Fight Night: Davis vs. Nogueira,2011-03-27T01:00Z,KeyArena,305 Harrison Street,Seattle,WA,USA,12
+400251959,UFC 129: St-Pierre vs. Shields,2011-05-01T01:00Z,Rogers Centre,"SKYDOME,  1 BLUE JAYS WAY, SUI",Toronto,ON,Canada,12
+400251939,UFC 130: Rampage vs. Hamill,2011-05-29T01:00Z,MGM Grand,,Las Vegas,NV,USA,10
+400251935,The Ultimate Fighter 13 Finale,2011-06-05T01:00Z,Pearl at the Palms,,Las Vegas,NV,USA,11
+400251927,UFC 131: Dos Santos vs. Carwin,2011-06-12T01:00Z,Rogers Arena,"GENERAL MOTORS PLACE,  800 GRI",Vancouver,BC,Canada,12
+400251919,UFC on Versus: Barry vs. Kongo,2011-06-27T01:00Z,PPG Paints Arena,,Pittsburgh,PA,USA,11
+400251918,UFC 132: Cruz vs. Faber 2,2011-07-03T01:00Z,Mandalay Bay,,Las Vegas,NV,USA,11
+400251899,UFC 133: Evans vs. Ortiz 2,2011-08-07T01:00Z,Wells Fargo Center,3601 Broad Street,Philadelphia,PA,USA,11
+400251895,UFC on Versus: Hardy vs. Lytle,2011-08-15T01:00Z,BMO Harris Bradley Center,"3501 S. LAKE DR. SUITE 100,",Milwaukee,WI,USA,12
+400251887,UFC 134: Silva vs. Okami,2011-08-28T01:00Z,Farmasi Arena,,Rio De Janeiro,,Brazil,13
+400251873,UFC Fight Night: Shields vs. Ellenberger,2011-09-18T01:00Z,Ernest N. Morial Convention Center,,New Orleans,LA,USA,12
+400251868,UFC 135: Jones vs. Rampage,2011-09-25T01:00Z,Ball Arena,200 WEST NATIONWIDE BLVD.,Denver,CO,USA,10
+400251865,UFC on Versus: Cruz vs. Johnson,2011-10-02T01:00Z,Capital One Arena,"MCI CENTER,  601 F STREET NW",Washington,DC,USA,10
+400251859,UFC 136: Edgar vs. Maynard 3,2011-10-09T01:00Z,Toyota Center (Houston),1510 POLK STREET,Houston,TX,USA,11
+400251839,UFC 137: Penn vs. Diaz,2011-10-30T01:00Z,Mandalay Bay,,Las Vegas,NV,USA,11
+400251835,UFC 138: Leben vs. Munoz,2011-11-06T01:00Z,LG Arena,,Birmingham,,England,10
+400251828,UFC on Fox: Velasquez vs. dos Santos,2011-11-13T02:00Z,Honda Center,2695 East Katella Ave.,Anaheim,CA,USA,10
+400251824,UFC 139: Shogun vs. Henderson,2011-11-20T02:00Z,SAP Center at San Jose,525 WEST SANTA CLARA STREET,San Jose,CA,USA,12
+400251809,The Ultimate Fighter 14 Finale,2011-12-04T02:00Z,Pearl at the Palms,,Las Vegas,NV,USA,10
+400251804,UFC 140: Jones vs. Machida,2011-12-11T02:00Z,Scotiabank Arena,40 Bay Street,Toronto,ON,Canada,12
+400251796,UFC 141: Lesnar vs. Overeem,2011-12-31T02:00Z,MGM Grand,,Las Vegas,NV,USA,10
+400251791,UFC 142: Aldo vs. Mendes,2012-01-15T02:00Z,Farmasi Arena,,Rio De Janeiro,,Brazil,10
+400251790,UFC on FX: Guillard vs. Miller,2012-01-20T05:00Z,Bridgestone Arena,501 Broadway,Nashville,TN,USA,10
+400251786,UFC on Fox: Evans vs. Davis,2012-01-28T23:00Z,United Center,"UNITED CENTER,  1901 W. MADISON ST.",Chicago,IL,USA,10
+400251782,UFC 143: Diaz vs. Condit,2012-02-05T02:00Z,Mandalay Bay,,Las Vegas,NV,USA,11
+400251775,UFC on Fuel TV: Ellenberger vs. Sanchez,2012-02-16T02:00Z,Omaha Civic Auditorium,,Omaha,NE,USA,9
+400251770,UFC 144: Edgar vs. Henderson,2012-02-26T02:00Z,Saitama Super Arena,,Saitama,,Japan,12
+400251768,UFC on FX: Alves vs. Kampmann,2012-03-02T23:00Z,Allphones Arena,,Sydney,NSW,Australia,11
+400251750,UFC on Fuel TV: Gustafsson vs. Silva,2012-04-15T01:00Z,Ericsson Globe,,Stockholm,,Sweden,13
+400251748,UFC 145: Jones vs. Evans,2012-04-22T01:00Z,State Farm Arena,1 Philips Drive,Atlanta,GA,USA,12
+400251744,UFC on Fox: Diaz vs. Miller,2012-05-05T22:00Z,Izod Center,,East Rutherford,NJ,USA,12
+400251742,UFC on Fuel TV: Korean Zombie vs. Poirier,2012-05-16T01:00Z,EagleBank Arena,,Fairfax,VA,,12
+400251741,UFC 146: dos Santos vs. Mir,2012-05-27T01:00Z,MGM Grand,,Las Vegas,NV,USA,12
+400257696,The Ultimate Fighter LIVE Finale,2012-06-02T00:00Z,Pearl at the Palms,,Las Vegas,NV,USA,10
+400257697,UFC on FX: Johnson vs. McCall,2012-06-08T22:00Z,BB&T Center,ONE PANTHER PARKWAY,Sunrise,FL,USA,12
+400251737,UFC on FX: Guida vs. Maynard,2012-06-22T22:00Z,Ocean Casino Resort,,Atlantic City,NJ,USA,12
+400251739,UFC 147: Silva vs. Franklin 2,2012-06-24T01:00Z,Estadio Jornalista Felipe Drumond,,Belo Horizonte,,Brazil,11
+400251738,UFC 148: Silva vs. Sonnen 2,2012-07-08T01:00Z,MGM Grand,,Las Vegas,NV,USA,11
+400262137,UFC on FUEL TV: Munoz vs. Weidman,2012-07-12T01:00Z,SAP Center at San Jose,525 WEST SANTA CLARA STREET,San Jose,CA,USA,11
+400257698,UFC 149: Faber vs. Barao,2012-07-22T01:00Z,Scotiabank Saddledome,"CANADIAN AIRLINES, SADDLEDOME,",Calgary,AB,Canada,11
+400251736,UFC on Fox: Shogun vs. Vera,2012-08-04T22:00Z,crypto.com Arena,"STAPLES CENTER,  1111 S. FIGUE",Los Angeles,CA,USA,10
+400262716,UFC 150: Henderson vs. Edgar 2,2012-08-12T01:00Z,Ball Arena,200 WEST NATIONWIDE BLVD.,Denver,CO,USA,10
+400275301,UFC 152: Jones vs. Belfort,2012-09-23T01:00Z,Scotiabank Arena,40 Bay Street,Toronto,ON,Canada,12
+400268321,UFC on FUEL TV: Struve vs. Miocic,2012-09-30T01:00Z,Motorpoint Arena,,Cardiff,,Wales,11
+400279401,UFC on FX: Browne vs. Bigfoot,2012-10-05T22:00Z,Target Center,"TARGET CENTER,  600 FIRST AVE. NORTH",Minneapolis,MN,USA,10
+400273781,UFC 153: Silva vs. Bonnar,2012-10-14T01:00Z,Farmasi Arena,,Rio De Janeiro,,Brazil,12
+400288381,UFC on FUEL TV: Franklin vs. Le,2012-11-11T02:00Z,CotaiArena,,Macau,,China,9
+400285141,UFC 154: St-Pierre vs. Condit,2012-11-18T01:00Z,Bell Centre,"BELL CENTRE,  1260 RUE DE LA",Montreal,PQ,Canada,12
+400400161,UFC on Fox: Henderson vs. Diaz,2012-12-08T23:00Z,KeyArena,305 Harrison Street,Seattle,WA,USA,11
+400403561,UFC on FX: Sotiropoulos vs. Pearson,2012-12-14T23:00Z,Gold Coast Convention and Exhibition Centre,,Gold Coast,QLD,Australia,10
+400401884,The Ultimate Fighter 16 Finale,2012-12-16T01:00Z,The Joint at Hard Rock Hotel & Casino (Las Vegas),,Las Vegas,NV,USA,11
+400288401,UFC 155: Dos Santos vs. Velasquez 2,2012-12-30T01:00Z,MGM Grand,,Las Vegas,NV,USA,12
+400429388,UFC on FX: Belfort vs. Bisping,2013-01-20T02:00Z,Ginasio Do Ibirapuera,,Sao Paulo,,Brazil,11
+400431620,UFC on Fox: Johnson vs. Dodson,2013-01-27T02:00Z,United Center,"UNITED CENTER,  1901 W. MADISON ST.",Chicago,IL,USA,11
+400429387,UFC 156: Aldo vs. Edgar,2013-02-03T02:00Z,Mandalay Bay,,Las Vegas,NV,USA,11
+400432943,UFC on FUEL TV: Barao vs. McDonald,2013-02-17T02:00Z,OVO Arena Wembley,,London,,England,12
+400432942,UFC 157: Rousey vs. Carmouche,2013-02-24T02:00Z,Honda Center,2695 East Katella Ave.,Anaheim,CA,USA,12
+400437518,UFC on FUEL TV: Silva vs. Stann,2013-03-03T02:00Z,Saitama Super Arena,,Saitama,,Japan,11
+400437516,UFC 158: St-Pierre vs. Diaz,2013-03-17T01:00Z,Bell Centre,"BELL CENTRE,  1260 RUE DE LA",Montreal,PQ,Canada,12
+400443735,UFC on FUEL TV 9: Mousasi vs. Latifi,2013-04-07T01:00Z,Ericsson Globe,,Stockholm,,Sweden,13
+400442350,The Ultimate Fighter 17 Finale,2013-04-14T01:00Z,Mandalay Bay,,Las Vegas,NV,USA,12
+400432946,UFC on Fox: Henderson vs. Melendez,2013-04-21T01:00Z,SAP Center at San Jose,525 WEST SANTA CLARA STREET,San Jose,CA,USA,12
+400426609,UFC 159: Jones vs. Sonnen,2013-04-28T01:00Z,Prudential Center,165 MULBERRY STREET,Newark,NJ,USA,11
+400446258,UFC 160: Velasquez vs. Silva 2,2013-05-26T01:00Z,MGM Grand,,Las Vegas,NV,USA,12
+400443591,UFC on FUEL TV 10: Nogueira vs. Werdum,2013-06-09T01:00Z,Paulo Sarasate Gymnasium,,Fortaleza,,Brazil,12
+400449281,UFC 161: Evans vs. Henderson,2013-06-16T01:00Z,Canada Life Centre,300 PORTAGE AVENUE,Winnipeg,MB,Canada,11
+400449280,UFC 162: Silva vs. Weidman,2013-07-07T01:00Z,MGM Grand,,Las Vegas,NV,USA,11
+400432947,UFC on Fox: Johnson vs. Moraga,2013-07-28T01:00Z,KeyArena,305 Harrison Street,Seattle,WA,USA,12
+400445287,UFC 163: Aldo vs. Korean Zombie,2013-08-04T01:00Z,Farmasi Arena,,Rio De Janeiro,,Brazil,12
+400449036,UFC Fight Night: Shogun vs. Sonnen,2013-08-18T01:00Z,TD Garden,ONE TD BANKNORTH GARDEN PL.,Boston,MA,USA,13
+400465576,UFC Fight Night: Condit vs. Kampmann 2,2013-08-29T01:00Z,Bankers Life Fieldhouse,"ONE CONSECO COURT,  125 S. PENNSYLVANIA ST.",Indianapolis,IN,USA,12
+400458296,UFC 164: Henderson vs. Pettis 2,2013-09-01T01:00Z,BMO Harris Bradley Center,"3501 S. LAKE DR. SUITE 100,",Milwaukee,WI,USA,12
+400475434,UFC Fight Night: Teixeira vs. Bader,2013-09-05T01:00Z,Estadio Jornalista Felipe Drumond,,Belo Horizonte,,Brazil,11
+400465974,UFC 165: Jones vs. Gustafsson,2013-09-22T01:00Z,Scotiabank Arena,40 Bay Street,Toronto,ON,Canada,13
+400490714,UFC Fight Night: Maia vs. Shields,2013-10-10T01:00Z,Jose Correa Arena,,Barueri,,Brazil,10
+400472016,UFC 166: Velasquez vs. Dos Santos 3,2013-10-20T01:00Z,Toyota Center (Houston),1510 POLK STREET,Houston,TX,USA,13
+400483973,UFC Fight Night: Machida vs. Munoz,2013-10-27T01:00Z,Manchester Arena,,Manchester,,England,12
+400478714,UFC Fight Night: Fight for the Troops 3,2013-11-07T02:00Z,Fort Campbell,,Fort Campbell,KY,USA,13
+400492654,UFC Fight Night: Belfort vs. Henderson,2013-11-10T02:00Z,Goiania Arena,,Goiania,,Brazil,11
+400472017,UFC 167: St-Pierre vs. Hendricks,2013-11-17T02:00Z,Mandalay Bay,,Las Vegas,NV,USA,12
+400490715,The Ultimate Fighter 18 Finale,2013-12-01T02:00Z,Mandalay Bay,,Las Vegas,NV,USA,10
+400495574,UFC Fight Night: Hunt vs. Bigfoot,2013-12-07T02:00Z,Brisbane Entertainment Centre,,Brisbane,QLD,Australia,11
+400432948,UFC on Fox: Johnson vs. Benavidez 2,2013-12-15T02:00Z,Sleep Train Arena,,Sacramento,CA,USA,11
+400477454,UFC 168: Weidman vs. Silva 2,2013-12-29T02:00Z,MGM Grand,,Las Vegas,NV,USA,11
+400513115,UFC Fight Night: Saffiedine vs. Lim,2014-01-05T02:00Z,Marina Bay Sands Expo and Convention Centre,,Marina Bay,,Singapore,10
+400517543,UFC Fight Night: Rockhold vs. Philippou,2014-01-15T05:00Z,The Arena at Gwinnett Center,6400 Sugarloaf Parkway,Duluth,GA,USA,12
+400514854,UFC on Fox: Henderson vs. Thomson,2014-01-25T16:30Z,United Center,"UNITED CENTER,  1901 W. MADISON ST.",Chicago,IL,USA,11
+400478716,UFC 169: Barao vs. Faber 2,2014-02-01T18:30Z,Prudential Center,165 MULBERRY STREET,Newark,NJ,USA,12
+400516084,UFC Fight Night: Machida vs. Mousasi,2014-02-15T19:30Z,Arena Jaragua,,Jaragua do Sul,,Brazil,12
+400514855,UFC 170: Rousey vs. McMann,2014-02-22T19:00Z,Mandalay Bay,,Las Vegas,NV,USA,11
+400528294,UFC Fight Night: Kim vs. Hathaway,2014-03-02T00:00Z,The Venetian Macau Resort Hotel,,Cotai,,Macau,8
+400515114,UFC Fight Night: Gustafsson vs. Manuwa,2014-03-08T14:00Z,O2 Arena (ENG),,London,,England,9
+400517714,UFC 171: Hendricks vs. Lawler,2014-03-15T18:00Z,American Airlines Center,,Dallas,TX,USA,13
+400531694,UFC Fight Night: Shogun vs. Henderson,2014-03-23T16:00Z,Nelio Dias Sports Gymnasium,,Natal,,Brazil,11
+400532917,UFC Fight Night: Minotauro vs. Nelson,2014-04-11T10:00Z,Flash Forum,,Abu Dhabi,,United Arab Emirates,8
+400529094,UFC Fight Night: Bisping vs. Kennedy,2014-04-16T15:15Z,Colisee Pepsi,250 HAMEL BLVD.,Quebec City,PQ,Canada,13
+400529894,UFC on Fox: Werdum vs. Browne,2014-04-19T15:30Z,Kia Center,,Orlando,FL,USA,13
+400529374,UFC 172: Jones vs. Teixeira,2014-04-26T19:30Z,Baltimore Arena,,Baltimore,MD,USA,10
+400539354,UFC Fight Night: Brown vs. Silva,2014-05-10T18:30Z,US Bank Arena,,Cincinnati,OH,USA,13
+400533294,UFC 173: Barao vs. Dillashaw,2014-05-24T04:00Z,MGM Grand,,Las Vegas,NV,USA,12
+400543514,UFC Fight Night: Munoz vs. Mousasi,2014-05-31T12:30Z,O2 World (Berlin),,Berlin,,Germany,10
+400547234,UFC Fight Night: Henderson vs. Khabilov,2014-06-07T19:30Z,Tingley Coliseum,,Albuquerque,NM,USA,11
+400534690,UFC 174: Johnson vs. Bagautinov,2014-06-14T19:00Z,Rogers Arena,"GENERAL MOTORS PLACE,  800 GRI",Vancouver,BC,Canada,11
+400546894,UFC Fight Night: Swanson vs. Stephens,2014-06-28T19:30Z,Frost Bank Center,,San Antonio,TX,USA,11
+400548474,UFC 175: Weidman vs. Machida,2014-07-05T19:00Z,Mandalay Bay,,Las Vegas,NV,USA,10
+400546414,The Ultimate Fighter 19 Finale,2014-07-06T18:00Z,Mandalay Bay,,Las Vegas,NV,USA,11
+400553594,UFC Fight Night: Cerrone vs. Miller,2014-07-16T18:30Z,Ocean Casino Resort,,Atlantic City,NJ,USA,11
+400543515,UFC Fight Night: McGregor vs. Brandao,2014-07-19T12:30Z,3Arena,,Dublin,,Ireland,10
+400549884,UFC on Fox: Lawler vs. Brown,2014-07-26T16:15Z,SAP Center at San Jose,525 WEST SANTA CLARA STREET,San Jose,CA,USA,12
+400557554,UFC Fight Night: Bader vs. Saint Preux,2014-08-16T06:30Z,Cross Insurance Center,,Bangor,ME,USA,10
+400553614,UFC Fight Night: Henderson vs. dos Anjos,2014-08-23T19:30Z,BOK Center,,Tulsa,OK,USA,11
+400559634,UFC 177: Dillashaw vs. Soto,2014-08-30T23:00Z,Sleep Train Arena,,Sacramento,CA,USA,8
+400560734,UFC Fight Night: Souza vs. Mousasi,2014-09-05T22:00Z,Foxwoods Casino,,Mashantucket,CT,USA,9
+400557634,UFC Fight Night: Silva vs. Arlovski,2014-09-13T18:00Z,Ginasio Nilson Nelson,,Brasilia,,Brazil,11
+400543518,UFC Fight Night: Hunt vs. Nelson,2014-09-20T19:00Z,Saitama Super Arena,,Saitama,,Japan,12
+400534691,UFC 178: Johnson vs. Cariaso,2014-09-27T12:00Z,MGM Grand,,Las Vegas,NV,USA,11
+400534692,UFC Fight Night: MacDonald vs. Saffiedine,2014-10-04T19:00Z,Halifax Forum,,Halifax,NS,Canada,12
+400557635,UFC 179: Aldo vs. Mendes 2,2014-10-25T18:00Z,Maracanazinho Gymnasium,,Rio De Janeiro,,Brazil,11
+400582487,UFC Fight Night: Rockhold vs. Bisping,2014-11-08T00:30Z,Allphones Arena,,Sydney,NSW,Australia,11
+400582010,UFC Fight Night: Shogun vs. Saint Preux,2014-11-08T19:00Z,Ginasio Municipal Tancredo Neves,,Uberlandia,,Brazil,10
+400555416,UFC 180: Werdum vs. Hunt,2014-11-15T19:00Z,Arena Ciudad de Mexico,,Mexico City,,Mexico,11
+400543520,UFC Fight Night: Edgar vs. Swanson,2014-11-22T19:00Z,Frank Erwin Center,,Austin,TX,USA,12
+400534693,UFC 181: Hendricks vs. Lawler 2,2014-12-06T19:00Z,Mandalay Bay,,Las Vegas,NV,USA,11
+400580047,The Ultimate Fighter 20 Finale,2014-12-12T23:30Z,Pearl at the Palms,,Las Vegas,NV,USA,11
+400567339,UFC Fight Night: Dos Santos vs. Miocic,2014-12-13T15:30Z,PHX Arena,201 E. JEFFERSON ST.,Phoenix,AZ,USA,12
+400584827,UFC Fight Night: Machida vs. Dollaway,2014-12-20T19:00Z,Jose Correa Arena,,Barueri,,Brazil,12
+400567345,UFC 182: Jones vs. Cormier,2015-01-03T19:00Z,MGM Grand,,Las Vegas,NV,USA,11
+400603615,UFC Fight Night: McGregor vs. Siver,2015-01-18T05:00Z,TD Garden,ONE TD BANKNORTH GARDEN PL.,Boston,MA,USA,12
+400606927,UFC on Fox: Gustafsson vs. Johnson,2015-01-24T16:00Z,Tele2 Arena,,Stockholm,,Sweden,12
+400575214,UFC 183: Silva vs. Diaz,2015-01-31T18:30Z,MGM Grand,,Las Vegas,NV,USA,11
+400605907,UFC Fight Night: Henderson vs. Thatch,2015-02-14T20:00Z,1stBank Center,11450 Broomfield Lane,Broomfield,CO,USA,10
+400607583,UFC Fight Night: Bigfoot vs. Mir,2015-02-22T22:00Z,Gigantinho Gymnasium,,Porto Alegre,,Brazil,11
+400603616,UFC 184: Rousey vs. Zingano,2015-02-28T19:00Z,crypto.com Arena,"STAPLES CENTER,  1111 S. FIGUE",Los Angeles,CA,USA,11
+400607612,UFC 185: Pettis vs. dos Anjos,2015-03-14T18:30Z,American Airlines Center,,Dallas,TX,USA,12
+400607614,UFC Fight Night: Maia vs. LaFlare,2015-03-21T19:00Z,Maracanazinho Gymnasium,,Rio De Janeiro,,Brazil,12
+400607615,UFC Fight Night: Mendes vs. Lamas,2015-04-04T11:00Z,EagleBank Arena,,Fairfax,VA,,10
+400607616,UFC Fight Night: Gonzaga vs. Cro Cop 2,2015-04-11T16:00Z,Krakow Arena,,Krakow,,Poland,12
+400607617,UFC on Fox: Machida vs. Rockhold,2015-04-18T16:30Z,Prudential Center,165 MULBERRY STREET,Newark,NJ,USA,11
+400607618,UFC 186: Johnson vs. Horiguchi,2015-04-25T18:30Z,Bell Centre,"BELL CENTRE,  1260 RUE DE LA",Montreal,PQ,Canada,12
+400762976,UFC Fight Night: Miocic vs. Hunt,2015-05-09T20:00Z,Adelaide Entertainment Centre,,Adelaide,SA,Australia,12
+400607619,UFC Fight Night: Edgar vs. Faber,2015-05-16T18:30Z,Mall of Asia Arena,,Manila,,Philippines,12
+400607621,UFC 187: Johnson vs. Cormier,2015-05-23T19:00Z,MGM Grand,,Las Vegas,NV,USA,11
+400607622,UFC Fight Night: Condit vs. Alves,2015-05-30T19:00Z,Goiania Arena,,Goiania,,Brazil,12
+400607623,UFC Fight Night: Boetsch vs. Henderson,2015-06-06T19:00Z,Smoothie King Center,1660 GIROD ST.,New Orleans,LA,USA,12
+400607624,UFC 188: Velasquez vs. Werdum,2015-06-14T00:00Z,Arena Ciudad de Mexico,,Mexico City,,Mexico,11
+400607625,UFC Fight Night: Jedrzejczyk vs. Penne,2015-06-20T12:00Z,O2 World (Berlin),,Berlin,,Germany,11
+400607626,UFC Fight Night: Machida vs. Romero,2015-06-27T20:00Z,Seminole Hard Rock Hotel and Casino,,Hollywood,FL,USA,9
+400590887,UFC 189: Mendes vs. McGregor,2015-07-11T19:00Z,MGM Grand,,Las Vegas,NV,USA,11
+400791347,The Ultimate Fighter 21 Finale,2015-07-12T21:00Z,MGM Grand,,Las Vegas,NV,USA,11
+400607628,UFC Fight Night: Mir vs. Duffee,2015-07-15T19:00Z,Pechanga Arena,3500 Sports Arena Boulevard,San Diego,CA,USA,12
+400607629,UFC Fight Night: Bisping vs. Leites,2015-07-18T10:00Z,OVO Hydro,,Glasgow,,Scotland,12
+400607630,UFC on Fox: Dillashaw vs. Barao 2,2015-07-25T20:00Z,United Center,"UNITED CENTER,  1901 W. MADISON ST.",Chicago,IL,USA,12
+400607631,UFC 190: Rousey vs. Correia,2015-08-01T19:00Z,Farmasi Arena,,Rio De Janeiro,,Brazil,13
+400607632,UFC Fight Night: Teixeira vs. Saint Preux,2015-08-08T18:30Z,Bridgestone Arena,501 Broadway,Nashville,TN,USA,13
+400607633,UFC Fight Night: Holloway vs. Oliveira,2015-08-23T18:00Z,SaskTel Centre,,Saskatoon,SK,Canada,12
+400607635,UFC 191: Johnson vs. Dodson 2,2015-09-05T19:00Z,MGM Grand,,Las Vegas,NV,USA,11
+400796284,UFC Fight Night: Barnett vs. Nelson,2015-09-26T18:00Z,Saitama Super Arena,,Saitama,,Japan,10
+400607638,UFC 192: Cormier vs. Gustafsson,2015-10-03T13:00Z,Toyota Center (Houston),1510 POLK STREET,Houston,TX,USA,12
+400817781,UFC Fight Night: Holohan vs. Smolka,2015-10-24T22:00Z,3Arena,,Dublin,,Ireland,10
+400607639,UFC Fight Night: Belfort vs Henderson 2,2015-11-07T18:00Z,Ibirapuera Gymnasium,,Sao Paulo,,Brazil,13
+400765682,UFC 193: Rousey vs. Holm,2015-11-14T18:30Z,Etihad Stadium,,Melbourne,VIC,Australia,13
+400607641,UFC Fight Night: Magny vs. Gastelum,2015-11-21T18:30Z,Monterrey Arena,,Monterrey,,Mexico,13
+400607642,UFC Fight Night: Henderson vs. Masvidal,2015-11-29T02:00Z,Olympic Park Gymnastics Arena,,Seoul,,South Korea,11
+400835547,UFC Fight Night: Namajunas vs. VanZant,2015-12-10T19:00Z,Cosmopolitan Resort,,Las Vegas,NV,USA,12
+400830847,The Ultimate Fighter 22 Finale,2015-12-11T23:00Z,Cosmopolitan Resort,,Las Vegas,NV,USA,10
+400607644,UFC 194: Aldo vs. McGregor,2015-12-12T18:30Z,MGM Grand,,Las Vegas,NV,USA,12
+400607645,UFC on Fox: Dos Anjos vs. Cerrone 2,2015-12-19T20:00Z,Kia Center,,Orlando,FL,USA,13
+400832048,UFC 195: Lawler vs. Condit,2016-01-02T18:30Z,MGM Grand,,Las Vegas,NV,USA,12
+400838669,UFC Fight Night: Dillashaw vs. Cruz,2016-01-18T03:00Z,TD Garden,ONE TD BANKNORTH GARDEN PL.,Boston,MA,USA,13
+400841529,UFC Fight Night: Johnson vs. Bader,2016-01-31T01:00Z,Prudential Center,165 MULBERRY STREET,Newark,NJ,USA,13
+400841527,UFC Fight Night: Hendricks vs. Thompson,2016-02-07T03:00Z,MGM Grand,,Las Vegas,NV,USA,12
+400841530,UFC Fight Night: Cerrone vs. Oliveira,2016-02-22T02:00Z,PPG Paints Arena,,Pittsburgh,PA,USA,13
+400841334,UFC Fight Night: Silva vs. Bisping,2016-02-27T12:00Z,O2 Arena (ENG),,London,,England,13
+400841528,UFC 196: McGregor vs. Diaz,2016-03-05T18:30Z,MGM Grand,,Las Vegas,NV,USA,12
+400841531,UFC Fight Night: Hunt vs. Mir,2016-03-20T02:00Z,Brisbane Entertainment Centre,,Brisbane,QLD,Australia,12
+400859828,UFC Fight Night: Rothwell vs. dos Santos,2016-04-10T18:00Z,Arena Zagreb,,Zagreb,,Croatia,13
+400864325,UFC Fight Night: Teixeira vs. Evans,2016-04-17T00:00Z,Amalie Arena,401 Channelside Drive,Tampa,FL,USA,11
+400866708,UFC 197: Jones vs. Saint Preux,2016-04-23T18:30Z,MGM Grand,,Las Vegas,NV,USA,12
+400859829,UFC Fight Night: Overeem vs. Arlovski,2016-05-08T18:00Z,Ahoy Sports Palace,,Rotterdam,,Netherlands,13
+400861388,UFC 198: Werdum vs. Miocic,2016-05-14T04:00Z,Arena da Baixada,,Curitiba,,Brazil,12
+400869909,UFC Fight Night: Almeida vs. Garbrandt,2016-05-30T01:00Z,Mandalay Bay,,Las Vegas,NV,USA,12
+400869908,UFC 199: Rockhold vs. Bisping 2,2016-06-04T22:15Z,The Forum (USA),,Los Angeles,CA,USA,13
+400869990,UFC Fight Night: MacDonald vs. Thompson,2016-06-19T02:30Z,Canadian Tire Centre,"1000 PALLADIUM DRIVE,",Ottawa,ON,Canada,13
+400874810,UFC Fight Night: Dos Anjos vs. Alvarez,2016-07-07T18:30Z,MGM Grand,,Las Vegas,NV,USA,12
+400860810,The Ultimate Fighter 23 Finale,2016-07-09T02:00Z,MGM Grand,,Las Vegas,NV,USA,12
+400818923,UFC 200: Tate vs. Nunes,2016-07-10T02:00Z,T-Mobile Arena,3780 South Las Vegas Boulevard,Las Vegas,NV,USA,12
+400874870,UFC Fight Night: McDonald vs. Lineker,2016-07-14T01:00Z,Denny Sanford Premier Center,,Sioux Falls,SD,USA,12
+400873536,UFC Fight Night: Holm vs. Shevchenko,2016-07-24T00:00Z,United Center,"UNITED CENTER,  1901 W. MADISON ST.",Chicago,IL,USA,11
+400876134,UFC 201: Lawler vs. Woodley,2016-07-31T02:00Z,State Farm Arena,1 Philips Drive,Atlanta,GA,USA,11
+400880606,UFC Fight Night: Rodriguez vs. Caceres,2016-08-07T02:00Z,Delta Center,,Salt Lake City,UT,USA,12
+400879557,UFC 202: Diaz vs. McGregor 2,2016-08-21T02:00Z,T-Mobile Arena,3780 South Las Vegas Boulevard,Las Vegas,NV,USA,12
+400882509,UFC Fight Night: Maia vs. Condit,2016-08-28T00:00Z,Rogers Arena,"GENERAL MOTORS PLACE,  800 GRI",Vancouver,BC,Canada,10
+400876250,UFC Fight Night: Arlovski vs. Barnett,2016-09-03T12:00Z,Barclaycard Arena,,Hamburg,,Germany,11
+400877534,UFC 203: Miocic vs. Overeem,2016-09-11T02:00Z,Rocket Mortgage FieldHouse,1 Center Ct,Cleveland,OH,USA,10
+400893902,UFC Fight Night: Poirier vs. Johnson,2016-09-18T02:00Z,Payne Arena,2600 N. 10TH STREET,Hidalgo,TX,USA,12
+400893903,UFC Fight Night: Cyborg vs. Lansberg,2016-09-25T02:00Z,Ginasio Nilson Nelson,,Brasilia,,Brazil,13
+400896610,UFC Fight Night: Lineker vs. Dodson,2016-10-02T03:00Z,Moda Center,"ONE CENTER COURT, STE. 200,",Portland,OR,USA,12
+400899015,UFC 204: Bisping vs. Henderson 2,2016-10-09T02:00Z,Manchester Arena,,Manchester,,England,11
+400897711,UFC Fight Night: Dos Anjos vs. Ferguson,2016-11-06T02:00Z,Arena Ciudad de Mexico,,Mexico City,,Mexico,13
+400896159,UFC 205: Alvarez vs. McGregor,2016-11-13T03:00Z,Madison Square Garden,"Madison Square Garden, Two Pennsylvania Plaza",New York,NY,USA,11
+400901153,UFC Fight Night: Mousasi vs. Hall 2,2016-11-19T17:00Z,SSE Arena (NIR),,Belfast,,Ireland,13
+400901155,UFC Fight Night: Whittaker vs. Brunson,2016-11-27T03:00Z,Rod Laver Arena,,Melbourne,VIC,Australia,13
+400876600,The Ultimate Fighter 24 Finale,2016-12-04T03:00Z,Pearl at the Palms,,Las Vegas,NV,USA,12
+400901156,UFC Fight Night: Lewis vs. Abdurakhimov,2016-12-10T02:00Z,Times Union Center,51 SOUTH PEARL ST.,Albany,NY,USA,12
+400901157,UFC 206: Holloway vs. Pettis,2016-12-11T03:00Z,Scotiabank Arena,40 Bay Street,Toronto,ON,Canada,12
+400901158,UFC Fight Night: VanZant vs. Waterson,2016-12-18T01:00Z,Golden 1 Center,500 David J. Stern Walk,Sacramento,CA,USA,13
+400901159,UFC 207: Nunes vs. Rousey,2016-12-31T03:00Z,T-Mobile Arena,3780 South Las Vegas Boulevard,Las Vegas,NV,USA,10
+400925481,UFC Fight Night: Rodriguez vs. Penn,2017-01-16T03:00Z,PHX Arena,201 E. JEFFERSON ST.,Phoenix,AZ,USA,12
+400925921,UFC Fight Night: Shevchenko vs. Pena,2017-01-29T01:00Z,Ball Arena,200 WEST NATIONWIDE BLVD.,Denver,CO,USA,12
+400925601,UFC Fight Night: Bermudez vs. The Korean Zombie,2017-02-05T03:00Z,Toyota Center (Houston),1510 POLK STREET,Houston,TX,USA,12
+400925788,UFC 208: Holm vs. de Randamie,2017-02-12T03:00Z,Barclays Center,620 Atlantic Ave,Brooklyn,NY,USA,10
+400925785,UFC Fight Night: Lewis vs. Browne,2017-02-20T02:00Z,Scotiabank Centre,"1800 Argyle St, Halifax, NS B3J 2V9, Canada",Halifax,NS,Canada,11
+400925922,UFC 209: Woodley vs. Thompson 2,2017-03-05T03:00Z,T-Mobile Arena,3780 South Las Vegas Boulevard,Las Vegas,NV,USA,11
+400929017,UFC Fight Night: Belfort vs. Gastelum,2017-03-12T03:00Z,CFO Arena,,Fortaleza,,Brazil,12
+400925786,UFC Fight Night: Manuwa vs. Anderson,2017-03-18T04:00Z,O2 Arena (ENG),,London,,England,11
+400928881,UFC 210: Cormier vs. Johnson 2,2017-04-09T00:00Z,KeyBank Center,"MARINE MIDLAND ARENA,  ONE SEY",Buffalo,NY,USA,13
+400942606,UFC Fight Night: Johnson vs. Reis,2017-04-16T02:00Z,T-Mobile Center,,Kansas City,MO,USA,13
+400942607,UFC Fight Night: Swanson vs. Lobov,2017-04-23T02:00Z,Bridgestone Arena,501 Broadway,Nashville,TN,USA,13
+400941268,UFC 211: Miocic vs. dos Santos 2,2017-05-13T17:00Z,American Airlines Center,,Dallas,TX,USA,12
+400944776,UFC Fight Night: Gustafsson vs. Teixeira,2017-05-29T02:00Z,Ericsson Globe,,Stockholm,,Sweden,12
+400942508,UFC 212: Aldo vs. Holloway,2017-06-03T04:00Z,Farmasi Arena,,Rio De Janeiro,,Brazil,12
+400947466,UFC Fight Night: Lewis vs. Hunt,2017-06-11T01:00Z,Spark Arena,,Auckland,,New Zealand,11
+400944285,UFC Fight Night: Holm vs. Correia,2017-06-18T01:00Z,Singapore Indoor Stadium,,Kallang,,Singapore,12
+400948306,UFC Fight Night: Chiesa vs. Lee,2017-06-26T01:00Z,Paycom Center,100 W Reno Ave,Oklahoma City,OK,USA,13
+400951439,The Ultimate Fighter 25 Finale,2017-07-08T01:00Z,T-Mobile Arena,3780 South Las Vegas Boulevard,Las Vegas,NV,USA,11
+400949108,UFC 213: Romero vs. Whittaker,2017-07-09T02:00Z,T-Mobile Arena,3780 South Las Vegas Boulevard,Las Vegas,NV,USA,11
+400961602,"Dana White's Contender Series: Season 1, Week 1",2017-07-11T19:00Z,UFC Training Center,,Las Vegas,NV,USA,5
+400947050,UFC Fight Night: Nelson vs. Ponzinibbio,2017-07-17T00:00Z,OVO Hydro,,Glasgow,,Scotland,12
+400966346,"Dana White's Contender Series: Season 1, Week 2",2017-07-19T02:00Z,UFC Training Center,,Las Vegas,NV,USA,5
+400949207,UFC Fight Night: Weidman vs. Gastelum,2017-07-23T02:00Z,Nassau Veterans Memorial Coliseum,1255 Hempstead Turnpike,Uniondale,NY,USA,13
+400966347,"Dana White's Contender Series: Season 1, Week 3",2017-07-25T12:00Z,UFC Training Center,,Las Vegas,NV,USA,5
+400925787,UFC 214: Cormier vs. Jones 2,2017-07-29T19:00Z,Honda Center,2695 East Katella Ave.,Anaheim,CA,USA,12
+400966348,"Dana White's Contender Series: Season 1, Week 4",2017-08-01T20:00Z,UFC Training Center,,Las Vegas,NV,USA,5
+400953601,UFC Fight Night: Pettis vs. Moreno,2017-08-05T20:00Z,Arena Ciudad de Mexico,,Mexico City,,Mexico,12
+400968458,"Dana White's Contender Series: Season 1, Week 5",2017-08-08T19:00Z,UFC Training Center,,Las Vegas,NV,USA,5
+400968459,"Dana White's Contender Series: Season 1, Week 6",2017-08-16T00:00Z,UFC Training Center,,Las Vegas,NV,USA,5
+400972137,"Dana White's Contender Series: Season 1, Week 7",2017-08-23T02:00Z,UFC Training Center,,Las Vegas,NV,USA,5
+400972138,"Dana White's Contender Series: Season 1, Week 8",2017-08-30T02:00Z,UFC Training Center,,Las Vegas,NV,USA,5
+400947051,UFC Fight Night: Volkov vs. Struve,2017-09-02T12:00Z,Ahoy Sports Palace,,Rotterdam,,Netherlands,12
+400952466,UFC 215: Nunes vs. Shevchenko 2,2017-09-09T19:00Z,Rogers Place,,Edmonton,AB,Canada,11
+400970916,UFC Fight Night: Rockhold vs. Branch,2017-09-17T00:00Z,PPG Paints Arena,,Pittsburgh,PA,USA,10
+400964019,UFC Fight Night: Saint Preux vs. Okami,2017-09-22T20:00Z,Saitama Super Arena,,Saitama,,Japan,10
+400972121,UFC 216: Ferguson vs. Lee,2017-10-07T19:00Z,T-Mobile Arena,3780 South Las Vegas Boulevard,Las Vegas,NV,USA,11
+400972122,UFC Fight Night: Cerrone vs. Till,2017-10-21T19:00Z,Ergo Arena,,Gdansk,,Poland,11
+400972116,UFC Fight Night: Brunson vs. Machida,2017-10-29T02:00Z,Ibirapuera Gymnasium,,Sao Paulo,,Brazil,12
+400972115,UFC 217: Bisping vs. St-Pierre,2017-11-05T02:00Z,Madison Square Garden,"Madison Square Garden, Two Pennsylvania Plaza",New York,NY,USA,11
+400972117,UFC Fight Night: Poirier vs. Pettis,2017-11-11T19:00Z,Chartway Arena,,Norfolk,VA,,13
+400972118,UFC Fight Night: Werdum vs. Tybura,2017-11-18T18:30Z,Qudos Bank Arena,,Sydney,NSW,Australia,13
+400972114,UFC Fight Night: Bisping vs. Gastelum,2017-11-26T04:00Z,Mercedes-Benz Arena,,Shanghai,,China,12
+401128195,The Ultimate Fighter 26 Semifinal,2017-11-29T17:00Z,,,,,,2
+400972134,The Ultimate Fighter 26 Finale,2017-12-01T19:30Z,Park Theater,,Las Vegas,NV,USA,11
+400972119,UFC 218: Holloway vs. Aldo 2,2017-12-02T18:00Z,Little Caesars Arena,2645 Woodward Avenue,Detroit,MI,USA,13
+400985822,UFC Fight Night: Swanson vs. Ortega,2017-12-09T18:30Z,Save Mart Center,,Fresno,CA,USA,13
+400972123,UFC Fight Night: Lawler vs. dos Anjos,2017-12-17T01:00Z,Canada Life Centre,300 PORTAGE AVENUE,Winnipeg,MB,Canada,11
+400972120,UFC 219: Cyborg vs. Holm,2017-12-30T19:30Z,T-Mobile Arena,3780 South Las Vegas Boulevard,Las Vegas,NV,USA,10
+400999549,UFC Fight Night: Stephens vs. Choi,2018-01-14T18:30Z,Enterprise Center,,St. Louis,MO,USA,11
+400999430,UFC 220: Miocic vs. Ngannou,2018-01-20T05:00Z,TD Garden,ONE TD BANKNORTH GARDEN PL.,Boston,MA,USA,11
+400999869,UFC Fight Night: Jacare vs. Brunson 2,2018-01-28T01:00Z,Spectrum Center,,Charlotte,NC,USA,12
+400999366,UFC Fight Night: Machida vs. Anders,2018-02-04T03:00Z,Mangueirinho Gymnasium,,Belem,,Brazil,11
+400999582,UFC 221: Romero vs. Rockhold,2018-02-10T18:30Z,Perth Arena,,Perth,WA,Australia,12
+400999870,UFC Fight Night: Cowboy vs. Medeiros,2018-02-18T18:00Z,Frank Erwin Center,,Austin,TX,USA,12
+400999871,UFC Fight Night: Emmett vs. Stephens,2018-02-24T16:00Z,Kia Center,,Orlando,FL,USA,12
+400999550,UFC 222: Cyborg vs. Kunitskaya,2018-03-03T18:30Z,T-Mobile Arena,3780 South Las Vegas Boulevard,Las Vegas,NV,USA,12
+400999627,UFC Fight Night: Werdum vs. Volkov,2018-03-17T21:00Z,O2 Arena (ENG),,London,,England,10
+401012186,UFC 223: Khabib vs. Iaquinta,2018-04-07T20:00Z,Barclays Center,620 Atlantic Ave,Brooklyn,NY,USA,9
+401011307,UFC Fight Night: Poirier vs. Gaethje,2018-04-15T00:00Z,Desert Diamond Arena,9400 W. MARYLAND AVENUE,Glendale,AZ,USA,14
+401017343,UFC Fight Night: Barboza vs. Lee,2018-04-22T02:00Z,Jim Whelan Boardwalk Hall,2301 Boardwalk,Atlantic City,NJ,USA,11
+401017344,UFC 224: Nunes vs. Pennington,2018-05-13T02:00Z,Farmasi Arena,,Rio De Janeiro,,Brazil,13
+401021503,UFC Fight Night: Maia vs. Usman,2018-05-19T18:30Z,Movistar Arena,,Santiago,,Chile,13
+401026710,UFC Fight Night: Thompson vs. Till,2018-05-27T10:30Z,Echo Arena,,Liverpool,,England,11
+401017493,UFC Fight Night: Rivera vs. Moraes,2018-06-02T02:00Z,Adirondack Bank Center,,Utica,NY,USA,12
+401017492,UFC 225: Whittaker vs. Romero 2,2018-06-09T23:00Z,United Center,"UNITED CENTER,  1901 W. MADISON ST.",Chicago,IL,USA,13
+401033270,"Dana White's Contender Series: Season 2, Week 1",2018-06-13T01:00Z,UFC Training Center,,Las Vegas,NV,USA,5
+401033277,"Dana White's Contender Series: Season 2, Week 2",2018-06-20T01:00Z,UFC Training Center,,Las Vegas,NV,USA,5
+401025730,UFC Fight Night: Cowboy vs. Edwards,2018-06-23T23:00Z,Singapore Indoor Stadium,,Kallang,,Singapore,13
+401033279,"Dana White's Contender Series: Season 2, Week 3",2018-06-27T01:00Z,UFC Training Center,,Las Vegas,NV,USA,5
+401006826,The Ultimate Fighter 27 Finale,2018-07-06T23:00Z,Pearl at the Palms,,Las Vegas,NV,USA,12
+401006827,UFC 226: Miocic vs. Cormier,2018-07-08T02:00Z,T-Mobile Arena,3780 South Las Vegas Boulevard,Las Vegas,NV,USA,11
+401033280,"Dana White's Contender Series: Season 2, Week 4",2018-07-11T01:00Z,UFC Training Center,,Las Vegas,NV,USA,5
+401031114,UFC Fight Night: Dos Santos vs. Ivanov,2018-07-14T23:00Z,Idaho Central Arena,233 S Capitol Blvd,Boise,ID,USA,13
+401033281,"Dana White's Contender Series: Season 2, Week 5",2018-07-18T01:00Z,UFC Training Center,,Las Vegas,NV,USA,5
+401028392,UFC Fight Night: Shogun vs. Smith,2018-07-22T10:30Z,Barclaycard Arena,,Hamburg,,Germany,13
+401033282,"Dana White's Contender Series: Season 2, Week 6",2018-07-25T01:00Z,UFC Training Center,,Las Vegas,NV,USA,5
+401030616,UFC Fight Night: Alvarez vs. Poirier 2,2018-07-28T16:00Z,Scotiabank Saddledome,"CANADIAN AIRLINES, SADDLEDOME,",Calgary,AB,Canada,13
+401033284,"Dana White's Contender Series: Season 2, Week 7",2018-08-01T01:00Z,UFC Training Center,,Las Vegas,NV,USA,5
+401028930,UFC 227: Dillashaw vs. Garbrandt 2,2018-08-04T18:30Z,crypto.com Arena,"STAPLES CENTER,  1111 S. FIGUE",Los Angeles,CA,USA,12
+401033283,"Dana White's Contender Series: Season 2, Week 8",2018-08-08T01:00Z,UFC Training Center,,Las Vegas,NV,USA,5
+401074496,Dana White's Contender Series: Brazil 1,2018-08-11T01:00Z,UFC Training Center,,Las Vegas,NV,USA,5
+401074497,Dana White's Contender Series: Brazil 2,2018-08-12T01:00Z,UFC Training Center,,Las Vegas,NV,USA,5
+401036886,UFC Fight Night: Gaethje vs. Vick,2018-08-25T18:30Z,Pinnacle Bank Arena,,Lincoln,NE,USA,13
+401035311,UFC 228: Woodley vs. Till,2018-09-08T18:00Z,American Airlines Center,,Dallas,TX,USA,13
+401033913,UFC Fight Night: Hunt vs. Oleinik,2018-09-15T18:00Z,Olympic Sports Complex (Moscow),,Moscow,,Russia,12
+401032731,UFC Fight Night: Marreta vs. Anders,2018-09-23T02:30Z,Ibirapuera Gymnasium,,Sao Paulo,,Brazil,14
+401006828,UFC 229: Khabib vs. McGregor,2018-10-07T02:00Z,T-Mobile Arena,3780 South Las Vegas Boulevard,Las Vegas,NV,USA,12
+401053583,UFC Fight Night: Volkan vs. Smith,2018-10-28T02:00Z,Avenir Centre,,Moncton,NB,Canada,13
+401053584,UFC 230: Cormier vs. Lewis,2018-11-04T02:00Z,Madison Square Garden,"Madison Square Garden, Two Pennsylvania Plaza",New York,NY,USA,12
+401053585,UFC Fight Night: Korean Zombie vs. Rodriguez,2018-11-11T03:00Z,Ball Arena,200 WEST NATIONWIDE BLVD.,Denver,CO,USA,12
+401053586,UFC Fight Night: Magny vs. Ponzinibbio,2018-11-18T03:00Z,Parque Roca,,Buenos Aires,,Argentina,12
+401053587,UFC Fight Night: Blaydes vs. Ngannou 2,2018-11-24T11:30Z,Cadillac Arena,,Beijing,,China,12
+401053589,The Ultimate Fighter 28 Finale,2018-12-01T03:00Z,Pearl at the Palms,,Las Vegas,NV,USA,13
+401053588,UFC Fight Night: Dos Santos vs. Tuivasa,2018-12-01T05:00Z,Adelaide Entertainment Centre,,Adelaide,SA,Australia,12
+401053582,UFC 231: Holloway vs. Ortega,2018-12-09T03:00Z,Scotiabank Arena,40 Bay Street,Toronto,ON,Canada,13
+401053610,UFC Fight Night: Lee vs. Iaquinta 2,2018-12-16T01:00Z,Fiserv Forum,,Milwaukee,WI,USA,12
+401006829,UFC 232: Jones vs. Gustafsson 2,2018-12-30T03:00Z,The Forum (USA),,Los Angeles,CA,USA,13
+401098393,UFC Fight Night: Cejudo vs. Dillashaw,2019-01-19T23:00Z,Barclays Center,620 Atlantic Ave,Brooklyn,NY,USA,13
+401098395,UFC Fight Night: Assuncao vs. Moraes 2,2019-02-02T22:00Z,CFO Arena,,Fortaleza,,Brazil,13
+401098396,UFC 234: Adesanya vs. Silva,2019-02-10T00:00Z,Rod Laver Arena,,Melbourne,VIC,Australia,11
+401098397,UFC Fight Night: Ngannou vs. Velasquez,2019-02-17T22:30Z,PHX Arena,201 E. JEFFERSON ST.,Phoenix,AZ,USA,12
+401098398,UFC Fight Night: Blachowicz vs. Santos,2019-02-23T16:00Z,O2 Arena (Prague),,Prague,,Czechia,13
+401098399,UFC 235: Jones vs. Smith,2019-03-02T23:30Z,T-Mobile Arena,3780 South Las Vegas Boulevard,Las Vegas,NV,USA,12
+401098400,UFC Fight Night: Lewis vs. Dos Santos,2019-03-09T22:00Z,INTRUST Bank Arena,500 E Waterman Street,Wichita,KS,USA,13
+401098294,UFC Fight Night: Till vs. Masvidal,2019-03-16T17:00Z,O2 Arena (ENG),,London,,England,12
+401098401,UFC Fight Night: Thompson vs. Pettis,2019-03-23T21:00Z,Bridgestone Arena,501 Broadway,Nashville,TN,USA,12
+401098402,UFC Fight Night: Barboza vs. Gaethje,2019-03-30T19:30Z,Wells Fargo Center,3601 Broad Street,Philadelphia,PA,USA,13
+401107793,UFC 236: Holloway vs. Poirier 2,2019-04-13T22:15Z,State Farm Arena,1 Philips Drive,Atlanta,GA,USA,13
+401107794,UFC Fight Night: Overeem vs. Oleinik,2019-04-20T14:00Z,Yubileyny Sports Palace,,Saint Petersburg,,Russia,11
+401107795,UFC Fight Night: Jacare vs. Hermansson,2019-04-27T21:30Z,BB&T Center,ONE PANTHER PARKWAY,Sunrise,FL,USA,13
+401107796,UFC Fight Night: Iaquinta vs. Cowboy,2019-05-04T21:00Z,Canadian Tire Centre,"1000 PALLADIUM DRIVE,",Ottawa,ON,Canada,12
+401107797,UFC 237: Namajunas vs. Andrade,2019-05-11T22:30Z,Farmasi Arena,,Rio De Janeiro,,Brazil,12
+401107798,UFC Fight Night: Dos Anjos vs. Lee,2019-05-18T21:00Z,Blue Cross Arena,ONE WAR MEMORIAL SQUARE,Rochester,NY,USA,13
+401107799,UFC Fight Night: Gustafsson vs. Smith,2019-06-01T14:00Z,Ericsson Globe,,Stockholm,,Sweden,12
+401107800,UFC 238: Cejudo vs. Moraes,2019-06-08T22:15Z,United Center,"UNITED CENTER,  1901 W. MADISON ST.",Chicago,IL,USA,13
+401128917,"Dana White's Contender Series: Season 3, Week 1",2019-06-19T00:00Z,UFC APEX,,Las Vegas,NV,USA,4
+401107801,UFC Fight Night: Moicano vs. The Korean Zombie,2019-06-22T20:00Z,Bon Secours Wellness Arena,,Greenville,SC,USA,11
+401128919,"Dana White's Contender Series: Season 3, Week 2",2019-06-26T00:00Z,UFC APEX,,Las Vegas,NV,USA,5
+401107802,UFC Fight Night: Ngannou vs. Dos Santos,2019-06-29T22:00Z,Target Center,"TARGET CENTER,  600 FIRST AVE. NORTH",Minneapolis,MN,USA,12
+401122133,UFC 239: Jones vs. Santos,2019-07-06T22:15Z,T-Mobile Arena,3780 South Las Vegas Boulevard,Las Vegas,NV,USA,12
+401128920,"Dana White's Contender Series: Season 3, Week 3",2019-07-10T00:00Z,UFC APEX,,Las Vegas,NV,USA,5
+401129395,UFC Fight Night: De Randamie vs. Ladd,2019-07-13T21:00Z,Golden 1 Center,500 David J. Stern Walk,Sacramento,CA,USA,12
+401128921,"Dana White's Contender Series: Season 3, Week 4",2019-07-17T00:00Z,UFC APEX,,Las Vegas,NV,USA,5
+401131735,UFC Fight Night: Dos Anjos vs. Edwards,2019-07-20T22:00Z,Frost Bank Center,,San Antonio,TX,USA,13
+401128922,"Dana White's Contender Series: Season 3, Week 5",2019-07-24T00:00Z,UFC APEX,,Las Vegas,NV,USA,5
+401128923,"Dana White's Contender Series: Season 3, Week 6",2019-07-31T00:00Z,UFC APEX,,Las Vegas,NV,USA,5
+401131736,UFC Fight Night: Covington vs. Lawler,2019-08-03T16:00Z,Prudential Center,165 MULBERRY STREET,Newark,NJ,USA,12
+401128924,"Dana White's Contender Series: Season 3, Week 7",2019-08-07T00:00Z,UFC APEX,,Las Vegas,NV,USA,5
+401131737,UFC Fight Night: Shevchenko vs. Carmouche 2,2019-08-10T21:00Z,Antel Arena,,Montevideo,,Uruguay,13
+401128925,"Dana White's Contender Series: Season 3, Week 8",2019-08-14T00:00Z,UFC APEX,,Las Vegas,NV,USA,5
+401130480,UFC 241: Cormier vs. Miocic 2,2019-08-17T22:30Z,Honda Center,2695 East Katella Ave.,Anaheim,CA,USA,12
+401128926,"Dana White's Contender Series: Season 3, Week 9",2019-08-21T00:00Z,UFC APEX,,Las Vegas,NV,USA,5
+401128918,"Dana White's Contender Series: Season 3, Week 10",2019-08-28T00:00Z,UFC APEX,,Las Vegas,NV,USA,5
+401131738,UFC Fight Night: Andrade vs. Zhang,2019-08-31T07:00Z,Shenzhen Dayun Arena,,Shenzhen,,China,11
+401129626,UFC 242: Khabib vs. Poirier,2019-09-07T14:15Z,The Arena,,Abu Dhabi,,United Arab Emirates,13
+401131739,UFC Fight Night: Cowboy vs. Gaethje,2019-09-14T21:00Z,Rogers Arena,"GENERAL MOTORS PLACE,  800 GRI",Vancouver,BC,Canada,12
+401131740,UFC Fight Night: Rodriguez vs. Stephens,2019-09-21T21:00Z,Arena Ciudad de Mexico,,Mexico City,,Mexico,12
+401131741,UFC Fight Night: Hermansson vs. Cannonier,2019-09-28T15:00Z,Royal Arena,,Copenhagen,,Denmark,13
+401131742,UFC 243: Whittaker vs. Adesanya,2019-10-05T22:45Z,Marvel Stadium,,Melbourne,VIC,Australia,11
+401131743,UFC Fight Night: Joanna vs. Waterson,2019-10-12T21:00Z,Amalie Arena,401 Channelside Drive,Tampa,FL,USA,14
+401131744,UFC Fight Night: Reyes vs. Weidman,2019-10-18T22:00Z,TD Garden,ONE TD BANKNORTH GARDEN PL.,Boston,MA,USA,13
+401131745,UFC Fight Night: Maia vs. Askren,2019-10-26T09:30Z,Singapore Indoor Stadium,,Kallang,,Singapore,11
+401131746,UFC 244: Masvidal vs. Diaz,2019-11-02T22:30Z,Madison Square Garden,"Madison Square Garden, Two Pennsylvania Plaza",New York,NY,USA,12
+401131748,UFC Fight Night: Zabit vs. Kattar,2019-11-09T16:00Z,CSKA Arena,,Moscow,,Russia,13
+401131747,UFC Fight Night: Blachowicz vs. Jacare,2019-11-16T22:00Z,Ginasio Do Ibirapuera,,Sao Paulo,,Brazil,12
+401131749,UFC Fight Night: Overeem vs. Rozenstruik,2019-12-07T22:45Z,Capital One Arena,"MCI CENTER,  601 F STREET NW",Washington,DC,USA,12
+401131750,UFC 245: Usman vs. Covington,2019-12-14T23:15Z,T-Mobile Arena,3780 South Las Vegas Boulevard,Las Vegas,NV,USA,13
+401131751,UFC Fight Night: Edgar vs. The Korean Zombie,2019-12-21T07:00Z,Sajik Arena,,Busan,,South Korea,13
+401186853,UFC 246: McGregor vs. Cowboy,2020-01-19T00:00Z,T-Mobile Arena,3780 South Las Vegas Boulevard,Las Vegas,NV,USA,11
+401184483,UFC Fight Night: Blaydes vs. Dos Santos,2020-01-25T22:00Z,PNC Arena,,Raleigh,NC,,12
+401186107,UFC 247: Jones vs. Reyes,2020-02-08T23:30Z,Toyota Center (Houston),1510 POLK STREET,Houston,TX,USA,12
+401186108,UFC Fight Night: Anderson vs. Blachowicz 2,2020-02-15T22:00Z,Santa Ana Star Center,,Rio Rancho,NM,USA,13
+401185213,UFC Fight Night: Felder vs. Hooker,2020-02-22T21:00Z,Spark Arena,,Auckland,,New Zealand,12
+401189213,UFC Fight Night: Benavidez vs. Figueiredo,2020-02-29T22:00Z,Chartway Arena,,Norfolk,VA,,12
+401189215,UFC 248: Adesanya vs. Romero,2020-03-08T00:00Z,T-Mobile Arena,3780 South Las Vegas Boulevard,Las Vegas,NV,USA,11
+401197169,UFC Fight Night: Lee vs. Oliveira,2020-03-14T19:00Z,Ginasio Nilson Nelson,,Brasilia,,Brazil,12
+401214013,UFC 249: Ferguson vs. Gaethje,2020-05-09T22:00Z,VyStar Veterans Memorial Arena,,Jacksonville,FL,USA,11
+401219973,UFC Fight Night: Smith vs. Teixeira,2020-05-13T22:00Z,VyStar Veterans Memorial Arena,,Jacksonville,FL,USA,10
+401216234,UFC Fight Night: Overeem vs. Harris,2020-05-16T22:00Z,VyStar Veterans Memorial Arena,,Jacksonville,FL,USA,11
+401220707,UFC Fight Night: Woodley vs. Burns,2020-05-30T22:00Z,UFC APEX,,Las Vegas,NV,USA,11
+401214015,UFC 250: Nunes vs. Spencer,2020-06-06T22:00Z,UFC APEX,,Las Vegas,NV,USA,12
+401220846,UFC Fight Night: Eye vs. Calvillo,2020-06-13T23:00Z,UFC APEX,,Las Vegas,NV,USA,10
+401220847,UFC Fight Night: Blaydes vs. Volkov,2020-06-20T21:00Z,UFC APEX,,Las Vegas,NV,USA,12
+401220968,UFC Fight Night: Poirier vs. Hooker,2020-06-27T22:00Z,UFC APEX,,Las Vegas,NV,USA,10
+401217353,UFC 251: Usman vs. Masvidal,2020-07-11T22:00Z,Flash Forum,,Abu Dhabi,,United Arab Emirates,13
+401220964,UFC Fight Night: Kattar vs. Ige,2020-07-15T23:00Z,Flash Forum,,Abu Dhabi,,United Arab Emirates,11
+401220965,UFC Fight Night: Figueiredo vs. Benavidez 2,2020-07-18T21:00Z,Flash Forum,,Abu Dhabi,,United Arab Emirates,12
+401220966,UFC Fight Night: Whittaker vs. Till,2020-07-25T21:00Z,Flash Forum,,Abu Dhabi,,United Arab Emirates,15
+401221004,UFC Fight Night: Brunson vs. Shahbazyan,2020-08-01T23:00Z,UFC APEX,,Las Vegas,NV,USA,8
+401221629,"Dana White's Contender Series: Season 4, Week 1",2020-08-05T00:00Z,UFC APEX,,Las Vegas,NV,USA,4
+401221827,UFC Fight Night: Lewis vs. Oleinik,2020-08-08T22:00Z,UFC APEX,,Las Vegas,NV,USA,12
+401221630,"Dana White's Contender Series: Season 4, Week 2",2020-08-12T00:00Z,UFC APEX,,Las Vegas,NV,USA,5
+401220967,UFC 252: Miocic vs. Cormier 3,2020-08-15T22:00Z,UFC APEX,,Las Vegas,NV,USA,11
+401221631,"Dana White's Contender Series: Season 4, Week 3",2020-08-19T00:00Z,UFC APEX,,Las Vegas,NV,USA,5
+401221825,UFC Fight Night: Munhoz vs. Edgar,2020-08-22T22:30Z,UFC APEX,,Las Vegas,NV,USA,9
+401221632,"Dana White's Contender Series: Season 4, Week 4",2020-08-26T00:00Z,UFC APEX,,Las Vegas,NV,USA,5
+401221826,UFC Fight Night: Smith vs. Rakic,2020-08-29T22:00Z,UFC APEX,,Las Vegas,NV,USA,10
+401222724,"Dana White's Contender Series: Season 4, Week 5",2020-09-02T00:00Z,UFC APEX,,Las Vegas,NV,USA,5
+401222725,UFC Fight Night: Overeem vs. Sakai,2020-09-05T23:00Z,UFC APEX,,Las Vegas,NV,USA,7
+401222785,"Dana White's Contender Series: Season 4, Week 6",2020-09-09T00:00Z,UFC APEX,,Las Vegas,NV,USA,5
+401222726,UFC Fight Night: Waterson vs. Hill,2020-09-12T21:00Z,UFC APEX,,Las Vegas,NV,USA,12
+401222786,"Dana White's Contender Series: Season 4, Week 7",2020-09-16T00:00Z,UFC APEX,,Las Vegas,NV,USA,5
+401222488,UFC Fight Night: Covington vs. Woodley,2020-09-19T21:00Z,UFC APEX,,Las Vegas,NV,USA,14
+401221824,UFC 253: Adesanya vs. Costa,2020-09-26T23:00Z,Flash Forum,,Abu Dhabi,,United Arab Emirates,11
+401222489,UFC Fight Night: Holm vs. Aldana,2020-10-03T23:30Z,Flash Forum,,Abu Dhabi,,United Arab Emirates,11
+401223164,UFC Fight Night: Moraes vs. Sandhagen,2020-10-10T21:00Z,Flash Forum,,Abu Dhabi,,United Arab Emirates,13
+401222984,UFC Fight Night: Ortega vs. The Korean Zombie,2020-10-17T20:00Z,Flash Forum,,Abu Dhabi,,United Arab Emirates,11
+401221918,UFC 254: Khabib vs. Gaethje,2020-10-24T15:00Z,Flash Forum,,Abu Dhabi,,United Arab Emirates,12
+401223930,UFC Fight Night: Hall vs. Silva,2020-10-31T20:00Z,UFC APEX,,Las Vegas,NV,USA,11
+401223624,"Dana White's Contender Series: Season 4, Week 8",2020-11-05T01:00Z,UFC APEX,,Las Vegas,NV,USA,4
+401224364,UFC Fight Night: Santos vs. Teixeira,2020-11-08T00:30Z,UFC APEX,,Las Vegas,NV,USA,10
+401223625,"Dana White's Contender Series: Season 4, Week 9",2020-11-11T01:00Z,UFC APEX,,Las Vegas,NV,USA,5
+401222707,UFC Fight Night: Felder vs. Dos Anjos,2020-11-14T22:00Z,UFC APEX,,Las Vegas,NV,USA,9
+401223626,"Dana White's Contender Series: Season 4, Week 10",2020-11-18T01:00Z,UFC APEX,,Las Vegas,NV,USA,5
+401224104,UFC 255: Figueiredo vs. Perez,2020-11-21T23:30Z,UFC APEX,,Las Vegas,NV,USA,12
+401223931,UFC Fight Night: Smith vs. Clark,2020-11-29T01:00Z,UFC APEX,,Las Vegas,NV,USA,10
+600000500,UFC Fight Night: Hermansson vs. Vettori,2020-12-06T01:00Z,UFC APEX,,Las Vegas,NV,USA,8
+600000340,UFC 256: Figueiredo vs. Moreno,2020-12-13T00:30Z,UFC APEX,,Las Vegas,NV,USA,10
+600000760,UFC Fight Night: Thompson vs. Neal,2020-12-19T21:00Z,UFC APEX,,Las Vegas,NV,USA,12
+600000637,UFC Fight Night: Holloway vs. Kattar,2021-01-16T17:00Z,Etihad Arena,,Abu Dhabi,,United Arab Emirates,10
+600001720,UFC Fight Night: Chiesa vs. Magny,2021-01-20T14:00Z,Etihad Arena,,Abu Dhabi,,United Arab Emirates,14
+600000835,UFC 257: Poirier vs. McGregor 2,2021-01-24T00:00Z,Etihad Arena,,Abu Dhabi,,United Arab Emirates,11
+600002201,UFC Fight Night: Overeem vs. Volkov,2021-02-06T22:00Z,UFC APEX,,Las Vegas,NV,USA,12
+600000638,UFC 258: Usman vs. Burns,2021-02-14T00:00Z,UFC APEX,,Las Vegas,NV,USA,10
+600002200,UFC Fight Night: Blaydes vs. Lewis,2021-02-20T22:00Z,UFC APEX,,Las Vegas,NV,USA,12
+600002600,UFC Fight Night: Rozenstruik vs. Gane,2021-02-27T23:00Z,UFC APEX,,Las Vegas,NV,USA,9
+600001860,UFC 259: Blachowicz vs. Adesanya,2021-03-06T22:15Z,UFC APEX,,Las Vegas,NV,USA,15
+600002541,UFC Fight Night: Edwards vs. Muhammad,2021-03-13T22:00Z,UFC APEX,,Las Vegas,NV,USA,13
+600003480,UFC Fight Night: Brunson vs. Holland,2021-03-20T23:30Z,UFC APEX,,Las Vegas,NV,USA,10
+600002601,UFC 260: Miocic vs. Ngannou 2,2021-03-27T23:30Z,UFC APEX,,Las Vegas,NV,USA,10
+600004560,UFC Fight Night: Vettori vs. Holland,2021-04-10T15:30Z,UFC APEX,,Las Vegas,NV,USA,13
+600004180,UFC Fight Night: Whittaker vs. Gastelum,2021-04-17T23:00Z,UFC APEX,,Las Vegas,NV,USA,10
+600004360,UFC 261: Usman vs. Masvidal 2,2021-04-24T22:00Z,VyStar Veterans Memorial Arena,,Jacksonville,FL,USA,13
+600004911,UFC Fight Night: Reyes vs. Prochazka,2021-05-01T23:00Z,UFC APEX,,Las Vegas,NV,USA,11
+600004802,UFC Fight Night: Rodriguez vs. Waterson,2021-05-08T22:00Z,UFC APEX,,Las Vegas,NV,USA,9
+600004800,UFC 262: Oliveira vs. Chandler,2021-05-15T22:30Z,Toyota Center (Houston),1510 POLK STREET,Houston,TX,USA,12
+600004801,UFC Fight Night: Font vs. Garbrandt,2021-05-22T20:00Z,UFC APEX,,Las Vegas,NV,USA,12
+600006285,UFC Fight Night: Rozenstruik vs. Sakai,2021-06-05T20:00Z,UFC APEX,,Las Vegas,NV,USA,13
+600005882,UFC 263: Adesanya vs. Vettori 2,2021-06-12T22:00Z,Desert Diamond Arena,9400 W. MARYLAND AVENUE,Glendale,AZ,USA,14
+600006201,UFC Fight Night: The Korean Zombie vs. Ige,2021-06-19T20:00Z,UFC APEX,,Las Vegas,NV,USA,12
+600005315,UFC Fight Night: Gane vs. Volkov,2021-06-26T17:00Z,UFC APEX,,Las Vegas,NV,USA,13
+600005500,UFC 264: Poirier vs. McGregor 3,2021-07-10T22:00Z,T-Mobile Arena,3780 South Las Vegas Boulevard,Las Vegas,NV,USA,12
+600006953,UFC Fight Night: Makhachev vs. Moises,2021-07-17T23:00Z,UFC APEX,,Las Vegas,NV,USA,10
+600006954,UFC Fight Night: Sandhagen vs. Dillashaw,2021-07-24T20:00Z,UFC APEX,,Las Vegas,NV,USA,11
+600010063,The Ultimate Fighter 29 Semifinal,2021-07-27T04:00Z,,,,,,1
+600007669,UFC Fight Night: Hall vs. Strickland,2021-07-31T22:30Z,UFC APEX,,Las Vegas,NV,USA,10
+600010060,The Ultimate Fighter 29 Semifinal,2021-08-03T04:00Z,,,,,,1
+600006400,UFC 265: Lewis vs. Gane,2021-08-07T22:00Z,Toyota Center (Houston),1510 POLK STREET,Houston,TX,USA,13
+600010062,The Ultimate Fighter 29 Semifinal,2021-08-10T04:00Z,,,,,,1
+600010061,The Ultimate Fighter 29 Semifinal,2021-08-17T04:00Z,,,,,,1
+600006804,UFC Fight Night: Cannonier vs. Gastelum,2021-08-21T23:00Z,UFC APEX,,Las Vegas,NV,USA,12
+600008941,UFC Fight Night: Barboza vs. Chikadze,2021-08-28T23:00Z,UFC APEX,,Las Vegas,NV,USA,12
+600008640,"Dana White's Contender Series: Season 5, Week 1",2021-09-01T00:00Z,UFC APEX,,Las Vegas,NV,USA,4
+600009540,UFC Fight Night: Brunson vs. Till,2021-09-04T18:00Z,UFC APEX,,Las Vegas,NV,USA,9
+600008641,"Dana White's Contender Series: Season 5, Week 2",2021-09-08T00:00Z,UFC APEX,,Las Vegas,NV,USA,5
+600008642,"Dana White's Contender Series: Season 5, Week 3",2021-09-15T00:00Z,UFC APEX,,Las Vegas,NV,USA,6
+600009680,UFC Fight Night: Smith vs. Spann,2021-09-18T20:00Z,UFC APEX,,Las Vegas,NV,USA,14
+600008643,"Dana White's Contender Series: Season 5, Week 4",2021-09-22T00:00Z,UFC APEX,,Las Vegas,NV,USA,5
+600006401,UFC 266: Volkanovski vs. Ortega,2021-09-25T22:00Z,T-Mobile Arena,3780 South Las Vegas Boulevard,Las Vegas,NV,USA,13
+600008644,"Dana White's Contender Series: Season 5, Week 5",2021-09-29T00:00Z,UFC APEX,,Las Vegas,NV,USA,4
+600009834,UFC Fight Night: Santos vs. Walker,2021-10-02T20:00Z,UFC APEX,,Las Vegas,NV,USA,12
+600010080,"Dana White's Contender Series: Season 5, Week 6",2021-10-06T00:00Z,UFC APEX,,Las Vegas,NV,USA,5
+600010160,UFC Fight Night: Dern vs. Rodriguez,2021-10-09T18:00Z,UFC APEX,,Las Vegas,NV,USA,9
+600010081,"Dana White's Contender Series: Season 5, Week 7",2021-10-13T00:00Z,UFC APEX,,Las Vegas,NV,USA,5
+600010407,UFC Fight Night: Ladd vs. Dumont,2021-10-16T20:30Z,UFC APEX,,Las Vegas,NV,USA,10
+600011551,"Dana White's Contender Series: Season 5, Week 8",2021-10-20T00:00Z,UFC APEX,,Las Vegas,NV,USA,5
+600010587,UFC Fight Night: Costa vs. Vettori,2021-10-23T17:00Z,UFC APEX,,Las Vegas,NV,USA,14
+600011552,"Dana White's Contender Series: Season 5, Week 9",2021-10-27T00:00Z,UFC APEX,,Las Vegas,NV,USA,6
+600009660,UFC 267: Blachowicz vs. Teixeira,2021-10-30T14:30Z,Etihad Arena,,Abu Dhabi,,United Arab Emirates,14
+600011553,"Dana White's Contender Series: Season 5, Week 10",2021-11-03T00:00Z,UFC APEX,,Las Vegas,NV,USA,5
+600010313,UFC 268: Usman vs. Covington 2,2021-11-06T22:00Z,Madison Square Garden,"Madison Square Garden, Two Pennsylvania Plaza",New York,NY,USA,14
+600011067,UFC Fight Night: Holloway vs. Rodriguez,2021-11-13T18:00Z,UFC APEX,,Las Vegas,NV,USA,11
+600011247,UFC Fight Night: Vieira vs. Tate,2021-11-20T20:00Z,UFC APEX,,Las Vegas,NV,USA,11
+600011267,UFC Fight Night: Font vs. Aldo,2021-12-05T00:00Z,UFC APEX,,Las Vegas,NV,USA,13
+600010340,UFC 269: Oliveira vs. Poirier,2021-12-11T23:00Z,T-Mobile Arena,3780 South Las Vegas Boulevard,Las Vegas,NV,USA,14
+600011248,UFC Fight Night: Lewis vs. Daukaus,2021-12-18T21:00Z,UFC APEX,,Las Vegas,NV,USA,13
+600013389,UFC Fight Night: Kattar vs. Chikadze,2022-01-15T22:00Z,UFC APEX,,Las Vegas,NV,USA,10
+600011827,UFC 270: Ngannou vs. Gane,2022-01-23T00:00Z,Honda Center,2695 East Katella Ave.,Anaheim,CA,USA,11
+600014067,UFC Fight Night: Hermansson vs. Strickland,2022-02-05T21:00Z,UFC APEX,,Las Vegas,NV,USA,13
+600013887,UFC 271: Adesanya vs. Whittaker 2,2022-02-12T23:00Z,Toyota Center (Houston),1510 POLK STREET,Houston,TX,USA,14
+600014767,UFC Fight Night: Walker vs. Hill,2022-02-19T21:00Z,UFC APEX,,Las Vegas,NV,USA,12
+600014327,UFC Fight Night: Makhachev vs. Green,2022-02-26T21:00Z,UFC APEX,,Las Vegas,NV,USA,11
+600013889,UFC 272: Covington vs. Masvidal,2022-03-05T23:00Z,T-Mobile Arena,3780 South Las Vegas Boulevard,Las Vegas,NV,USA,13
+600014167,UFC Fight Night: Santos vs. Ankalaev,2022-03-12T21:00Z,UFC APEX,,Las Vegas,NV,USA,14
+600015251,UFC Fight Night: Volkov vs. Aspinall,2022-03-19T17:30Z,O2 Arena (ENG),,London,,England,12
+600013888,UFC Fight Night: Blaydes vs. Daukaus,2022-03-26T20:00Z,Nationwide Arena,"200 WEST NATIONWIDE BLVD.,",Columbus,OH,USA,12
+600016207,UFC 273: Volkanovski vs. The Korean Zombie,2022-04-09T22:30Z,VyStar Veterans Memorial Arena,,Jacksonville,FL,USA,12
+600016208,UFC Fight Night: Luque vs. Muhammad 2,2022-04-16T21:30Z,UFC APEX,,Las Vegas,NV,USA,14
+600016209,UFC Fight Night: Lemos vs. Andrade,2022-04-23T22:00Z,UFC APEX,,Las Vegas,NV,USA,11
+600016747,UFC Fight Night: Font vs. Vera,2022-04-30T20:00Z,UFC APEX,,Las Vegas,NV,USA,11
+600017087,UFC 274: Oliveira vs. Gaethje,2022-05-07T21:30Z,PHX Arena,201 E. JEFFERSON ST.,Phoenix,AZ,USA,14
+600018367,UFC Fight Night: Blachowicz vs. Rakic,2022-05-14T23:30Z,UFC APEX,,Las Vegas,NV,USA,11
+600018214,UFC Fight Night: Holm vs. Vieira,2022-05-21T20:00Z,UFC APEX,,Las Vegas,NV,USA,11
+600018857,UFC Fight Night: Volkov vs. Rozenstruik,2022-06-04T17:00Z,UFC APEX,,Las Vegas,NV,USA,14
+600018247,UFC 275: Teixeira vs. Procházka,2022-06-11T23:00Z,Singapore Indoor Stadium,,Kallang,,Singapore,11
+600019387,UFC Fight Night: Kattar vs. Emmett,2022-06-18T20:00Z,Moody Center,2001 Dedman Drive,Austin,TX,USA,13
+600020441,UFC Fight Night: Tsarukyan vs. Gamrot,2022-06-25T23:00Z,UFC APEX,,Las Vegas,NV,USA,12
+600015541,UFC 276: Adesanya vs. Cannonier,2022-07-02T22:00Z,T-Mobile Arena,3780 South Las Vegas Boulevard,Las Vegas,NV,USA,12
+600023343,The Ultimate Fighter 30 Semifinal: Nunes vs. Peña,2022-07-05T16:00Z,UFC APEX,,Las Vegas,NV,USA,1
+600019227,UFC Fight Night: Dos Anjos vs. Fiziev,2022-07-09T22:00Z,UFC APEX,,Las Vegas,NV,USA,11
+600023344,The Ultimate Fighter 30 Semifinal: Nunes vs. Peña,2022-07-12T16:00Z,UFC APEX,,Las Vegas,NV,USA,1
+600020987,UFC Fight Night: Ortega vs. Rodriguez,2022-07-16T15:00Z,UBS Arena,2150 Hempstead Turnpike,Elmont,NY,USA,12
+600023345,The Ultimate Fighter 30 Semifinal: Nunes vs. Peña,2022-07-19T16:00Z,UFC APEX,,Las Vegas,NV,USA,1
+600019287,UFC Fight Night: Blaydes vs. Aspinall,2022-07-23T16:00Z,O2 Arena (ENG),,London,,England,14
+600021770,"Dana White's Contender Series: Season 6, Week 1",2022-07-27T00:00Z,UFC APEX,,Las Vegas,NV,USA,4
+600020707,UFC 277: Peña vs. Nunes 2,2022-07-30T22:00Z,American Airlines Center,,Dallas,TX,USA,13
+600021771,"Dana White's Contender Series: Season 6, Week 2",2022-08-03T00:00Z,UFC APEX,,Las Vegas,NV,USA,5
+600021087,UFC Fight Night: Santos vs. Hill,2022-08-06T23:30Z,UFC APEX,,Las Vegas,NV,USA,10
+600021772,"Dana White's Contender Series: Season 6, Week 3",2022-08-10T00:00Z,UFC APEX,,Las Vegas,NV,USA,5
+600022153,UFC Fight Night: Vera vs. Cruz,2022-08-13T20:00Z,Pechanga Arena,3500 Sports Arena Boulevard,San Diego,CA,USA,13
+600021773,"Dana White's Contender Series: Season 6, Week 4",2022-08-17T00:00Z,UFC APEX,,Las Vegas,NV,USA,5
+600021776,UFC 278: Usman vs. Edwards 2,2022-08-20T22:30Z,Delta Center,,Salt Lake City,UT,USA,12
+600022207,"Dana White's Contender Series: Season 6, Week 5",2022-08-24T00:00Z,UFC APEX,,Las Vegas,NV,USA,5
+600022208,"Dana White's Contender Series: Season 6, Week 6",2022-08-31T00:00Z,UFC APEX,,Las Vegas,NV,USA,5
+600020487,UFC Fight Night: Gane vs. Tuivasa,2022-09-03T16:00Z,Bercy Arena,,Paris,,France,12
+600022209,"Dana White's Contender Series: Season 6, Week 7",2022-09-07T00:00Z,UFC APEX,,Las Vegas,NV,USA,5
+600023167,UFC 279: Diaz vs. Ferguson,2022-09-10T22:00Z,T-Mobile Arena,3780 South Las Vegas Boulevard,Las Vegas,NV,USA,13
+600022210,"Dana White's Contender Series: Season 6, Week 8",2022-09-14T00:00Z,UFC APEX,,Las Vegas,NV,USA,5
+600022789,UFC Fight Night: Sandhagen vs. Song,2022-09-17T20:00Z,UFC APEX,,Las Vegas,NV,USA,13
+600022211,"Dana White's Contender Series: Season 6, Week 9",2022-09-21T00:00Z,UFC APEX,,Las Vegas,NV,USA,5
+600022212,"Dana White's Contender Series: Season 6, Week 10",2022-09-28T00:00Z,UFC APEX,,Las Vegas,NV,USA,5
+600023587,UFC Fight Night: Dern vs. Yan,2022-10-01T20:00Z,UFC APEX,,Las Vegas,NV,USA,11
+600023508,UFC Fight Night: Grasso vs. Araujo,2022-10-15T20:00Z,UFC APEX,,Las Vegas,NV,USA,11
+600017767,UFC 280: Oliveira vs. Makhachev,2022-10-22T14:00Z,Etihad Arena,,Abu Dhabi,,United Arab Emirates,12
+600023527,UFC Fight Night: Kattar vs. Allen,2022-10-29T20:00Z,UFC APEX,,Las Vegas,NV,USA,11
+600024347,UFC Fight Night: Rodriguez vs. Lemos,2022-11-05T20:00Z,UFC APEX,,Las Vegas,NV,USA,11
+600023427,UFC 281: Adesanya vs. Pereira,2022-11-12T23:00Z,Madison Square Garden,"Madison Square Garden, Two Pennsylvania Plaza",New York,NY,USA,14
+600024907,UFC Fight Night: Nzechukwu vs. Cutelaba,2022-11-19T18:00Z,UFC APEX,,Las Vegas,NV,USA,11
+600024851,UFC Fight Night: Thompson vs. Holland,2022-12-04T00:00Z,Kia Center,,Orlando,FL,USA,14
+600025607,UFC 282: Blachowicz vs. Ankalaev,2022-12-10T23:30Z,T-Mobile Arena,3780 South Las Vegas Boulevard,Las Vegas,NV,USA,12
+600023847,UFC Fight Night: Cannonier vs. Strickland,2022-12-17T21:00Z,UFC APEX,,Las Vegas,NV,USA,13
+600026147,UFC Fight Night: Strickland vs. Imavov,2023-01-14T21:00Z,UFC APEX,,Las Vegas,NV,USA,11
+600023647,UFC 283: Teixeira vs. Hill,2023-01-21T22:30Z,Farmasi Arena,,Rio De Janeiro,,Brazil,15
+600027632,UFC Fight Night: Lewis vs. Spivac,2023-02-05T03:00Z,UFC APEX,,Las Vegas,NV,USA,11
+600025531,UFC 284: Makhachev vs. Volkanovski,2023-02-11T23:00Z,RAC Arena (AUS),,Perth,WA,Australia,13
+600027447,UFC Fight Night: Andrade vs. Blanchfield,2023-02-18T21:00Z,UFC APEX,,Las Vegas,NV,USA,11
+600027450,UFC Fight Night: Muniz vs. Allen,2023-02-25T21:00Z,UFC APEX,,Las Vegas,NV,USA,10
+600027449,UFC 285: Jones vs. Gane,2023-03-04T22:30Z,T-Mobile Arena,3780 South Las Vegas Boulevard,Las Vegas,NV,USA,14
+600027448,UFC Fight Night: Yan vs. Dvalishvili,2023-03-11T20:00Z,The Theater at Virgin Hotels,,Las Vegas,NV,USA,13
+600027407,UFC 286: Edwards vs. Usman 3,2023-03-18T16:30Z,O2 Arena (ENG),,London,,England,15
+600027451,UFC Fight Night: Vera vs. Sandhagen,2023-03-25T20:30Z,Frost Bank Center,,San Antonio,TX,USA,10
+600029512,UFC 287: Pereira vs. Adesanya 2,2023-04-09T02:00Z,Kaseya Center,"AMERICAN AIRLINES ARENA,  601 BISCAYNE BLVD.",Miami,FL,USA,12
+600030131,UFC Fight Night: Holloway vs. Allen,2023-04-15T21:30Z,T-Mobile Center,,Kansas City,MO,USA,14
+600030732,UFC Fight Night: Pavlovich vs. Blaydes,2023-04-22T20:30Z,UFC APEX,,Las Vegas,NV,USA,11
+600032152,UFC Fight Night: Song vs. Simon,2023-04-29T20:30Z,UFC APEX,,Las Vegas,NV,USA,11
+600031072,UFC 288: Sterling vs. Cejudo,2023-05-06T22:30Z,Prudential Center,165 MULBERRY STREET,Newark,NJ,USA,12
+600032692,UFC Fight Night: Rozenstruik vs. Almeida,2023-05-13T16:00Z,Spectrum Center,,Charlotte,NC,USA,11
+600033352,UFC Fight Night: Dern vs. Hill,2023-05-20T20:00Z,UFC APEX,,Las Vegas,NV,USA,12
+600033393,UFC Fight Night: Kara-France vs. Albazi,2023-06-03T22:00Z,UFC APEX,,Las Vegas,NV,USA,13
+600032952,UFC 289: Nunes vs. Aldana,2023-06-10T23:00Z,Rogers Arena,"GENERAL MOTORS PLACE,  800 GRI",Vancouver,BC,Canada,11
+600033395,UFC Fight Night: Vettori vs. Cannonier,2023-06-17T23:00Z,UFC APEX,,Las Vegas,NV,USA,12
+600033394,UFC Fight Night: Emmett vs. Topuria,2023-06-24T15:30Z,VyStar Veterans Memorial Arena,,Jacksonville,FL,USA,13
+600033392,UFC Fight Night: Strickland vs. Magomedov,2023-07-01T20:00Z,UFC APEX,,Las Vegas,NV,USA,12
+600031074,UFC 290: Volkanovski vs. Rodriguez,2023-07-08T22:00Z,T-Mobile Arena,3780 South Las Vegas Boulevard,Las Vegas,NV,USA,13
+600033932,UFC Fight Night: Holm vs. Bueno Silva,2023-07-15T23:00Z,UFC APEX,,Las Vegas,NV,USA,13
+600033408,UFC Fight Night: Aspinall vs. Tybura,2023-07-22T16:00Z,O2 Arena (ENG),,London,,England,15
+600037612,The Ultimate Fighter 31 Semifinal: McGregor vs. Chandler,2023-07-26T02:00Z,UFC APEX,,Las Vegas,NV,USA,1
+600034052,UFC 291: Poirier vs. Gaethje 2,2023-07-29T22:00Z,Delta Center,,Salt Lake City,UT,USA,11
+600037613,The Ultimate Fighter 31 Semifinal: McGregor vs. Chandler,2023-08-02T02:00Z,UFC APEX,,Las Vegas,NV,USA,1
+600035212,UFC Fight Night: Sandhagen vs. Font,2023-08-05T22:00Z,Bridgestone Arena,501 Broadway,Nashville,TN,USA,12
+600036332,"Dana White's Contender Series: Season 7, Week 1",2023-08-08T23:00Z,UFC APEX,,Las Vegas,NV,USA,5
+600034512,UFC Fight Night: Luque vs. Dos Anjos,2023-08-12T20:00Z,UFC APEX,,Las Vegas,NV,USA,13
+600036492,"Dana White's Contender Series: Season 7, Week 2",2023-08-15T23:00Z,UFC APEX,,Las Vegas,NV,USA,5
+600034053,UFC 292: Sterling vs. O'Malley,2023-08-19T22:30Z,TD Garden,ONE TD BANKNORTH GARDEN PL.,Boston,MA,USA,12
+600036493,"Dana White's Contender Series: Season 7, Week 3",2023-08-23T00:00Z,UFC APEX,,Las Vegas,NV,USA,4
+600035213,UFC Fight Night: Holloway vs. The Korean Zombie,2023-08-26T09:00Z,Singapore Indoor Stadium,,Kallang,,Singapore,13
+600036494,"Dana White's Contender Series: Season 7, Week 4",2023-08-30T00:00Z,UFC APEX,,Las Vegas,NV,USA,5
+600035214,UFC Fight Night: Gane vs. Spivac,2023-09-02T16:30Z,Bercy Arena,,Paris,,France,11
+600036495,"Dana White's Contender Series: Season 7, Week 5",2023-09-06T00:00Z,UFC APEX,,Las Vegas,NV,USA,5
+600034272,UFC 293: Adesanya vs. Strickland,2023-09-09T22:00Z,Qudos Bank Arena,,Sydney,NSW,Australia,12
+600036496,"Dana White's Contender Series: Season 7, Week 6",2023-09-13T00:00Z,UFC APEX,,Las Vegas,NV,USA,5
+600035912,Noche UFC: Grasso vs. Shevchenko 2,2023-09-16T23:00Z,T-Mobile Arena,3780 South Las Vegas Boulevard,Las Vegas,NV,USA,11
+600036497,"Dana White's Contender Series: Season 7, Week 7",2023-09-20T00:00Z,UFC APEX,,Las Vegas,NV,USA,5
+600037292,UFC Fight Night: Fiziev vs. Gamrot,2023-09-23T20:00Z,UFC APEX,,Las Vegas,NV,USA,11
+600036498,"Dana White's Contender Series: Season 7, Week 8",2023-09-27T00:00Z,UFC APEX,,Las Vegas,NV,USA,5
+600036499,"Dana White's Contender Series: Season 7, Week 9",2023-10-04T00:00Z,UFC APEX,,Las Vegas,NV,USA,4
+600037932,UFC Fight Night: Dawson vs. Green,2023-10-07T20:00Z,UFC APEX,,Las Vegas,NV,USA,10
+600036500,"Dana White's Contender Series: Season 7, Week 10",2023-10-11T00:00Z,UFC APEX,,Las Vegas,NV,USA,6
+600038272,UFC Fight Night: Yusuff vs. Barboza,2023-10-14T20:00Z,UFC APEX,,Las Vegas,NV,USA,11
+600031832,UFC 294: Makhachev vs. Volkanovski 2,2023-10-21T14:00Z,Etihad Arena,,Abu Dhabi,,United Arab Emirates,13
+600037492,UFC Fight Night: Almeida vs. Lewis,2023-11-04T22:00Z,Ginasio Do Ibirapuera,,Sao Paulo,,Brazil,10
+600036292,UFC 295: Procházka vs. Pereira,2023-11-11T23:00Z,Madison Square Garden,"Madison Square Garden, Two Pennsylvania Plaza",New York,NY,USA,13
+600037752,UFC Fight Night: Allen vs. Craig,2023-11-18T19:00Z,UFC APEX,,Las Vegas,NV,USA,14
+600039593,UFC Fight Night: Dariush vs. Tsarukyan,2023-12-02T21:00Z,Moody Center,2001 Dedman Drive,Austin,TX,USA,12
+600039634,UFC Fight Night: Song vs. Gutierrez,2023-12-10T00:30Z,UFC APEX,,Las Vegas,NV,USA,11
+600038652,UFC 296: Edwards vs. Covington,2023-12-16T23:30Z,T-Mobile Arena,3780 South Las Vegas Boulevard,Las Vegas,NV,USA,12
+600039893,UFC Fight Night: Ankalaev vs. Walker 2,2024-01-13T21:00Z,UFC APEX,,Las Vegas,NV,USA,11
+600039713,UFC 297: Strickland vs. Du Plessis,2024-01-20T23:30Z,Scotiabank Arena,40 Bay Street,Toronto,ON,Canada,12
+600040373,UFC Fight Night: Dolidze vs. Imavov,2024-02-03T21:00Z,UFC APEX,,Las Vegas,NV,USA,13
+600040033,UFC Fight Night: Hermansson vs. Pyfer,2024-02-10T21:00Z,UFC APEX,,Las Vegas,NV,USA,14
+600039753,UFC 298: Volkanovski vs. Topuria,2024-02-17T23:30Z,Honda Center,2695 East Katella Ave.,Anaheim,CA,USA,12
+600041054,UFC Fight Night: Moreno vs. Royval 2,2024-02-25T00:00Z,Mexico City Arena,,Mexico City,,Mexico,12
+600042433,UFC Fight Night: Rozenstruik vs. Gaziev,2024-03-02T18:30Z,UFC APEX,,Las Vegas,NV,USA,11
+600039754,UFC 299: O'Malley vs. Vera 2,2024-03-09T23:00Z,Kaseya Center,"AMERICAN AIRLINES ARENA,  601 BISCAYNE BLVD.",Miami,FL,USA,14
+600041993,UFC Fight Night: Tuivasa vs. Tybura,2024-03-16T20:00Z,UFC APEX,,Las Vegas,NV,USA,13
+600041994,UFC Fight Night: Ribas vs. Namajunas,2024-03-23T23:00Z,UFC APEX,,Las Vegas,NV,USA,13
+600041055,UFC Fight Night: Blanchfield vs. Fiorot,2024-03-30T23:00Z,Boardwalk Hall,,Atlantic City,NJ,USA,13
+600041733,UFC Fight Night: Allen vs. Curtis 2,2024-04-06T19:00Z,UFC APEX,,Las Vegas,NV,USA,12
+600041053,UFC 300: Pereira vs. Hill,2024-04-13T22:00Z,T-Mobile Arena,3780 South Las Vegas Boulevard,Las Vegas,NV,USA,13
+600043333,UFC Fight Night: Nicolau vs. Perez,2024-04-27T20:00Z,UFC APEX,,Las Vegas,NV,USA,13
+600043073,UFC 301: Pantoja vs. Erceg,2024-05-04T22:00Z,Farmasi Arena,,Rio De Janeiro,,Brazil,13
+600043713,UFC Fight Night: Lewis vs. Nascimento,2024-05-11T20:00Z,Enterprise Center,,St. Louis,MO,USA,12
+600044353,UFC Fight Night: Barboza vs. Murphy,2024-05-18T20:00Z,UFC APEX,,Las Vegas,NV,USA,12
+600044413,UFC 302: Makhachev vs. Poirier,2024-06-01T22:30Z,Prudential Center,165 MULBERRY STREET,Newark,NJ,USA,12
+600044933,UFC Fight Night: Cannonier vs. Imavov,2024-06-08T21:00Z,KFC Yum! Center,1 ARENA PLAZA,Louisville,KY,USA,14
+600045713,UFC Fight Night: Perez vs. Taira,2024-06-15T23:00Z,UFC APEX,,Las Vegas,NV,USA,11
+600042393,UFC Fight Night: Whittaker vs. Aliskerov,2024-06-22T16:00Z,Kingdom Arena,,Riyadh,,Saudi Arabia,11
+600043173,UFC 303: Pereira vs. Procházka 2,2024-06-29T22:00Z,T-Mobile Arena,3780 South Las Vegas Boulevard,Las Vegas,NV,USA,13
+600046021,UFC Fight Night: Namajunas vs. Cortez,2024-07-13T23:00Z,Ball Arena,200 WEST NATIONWIDE BLVD.,Denver,CO,USA,12
+600046020,UFC Fight Night: Lemos vs. Jandiroba,2024-07-20T21:00Z,UFC APEX,,Las Vegas,NV,USA,11
+600045073,UFC 304: Edwards vs. Muhammad 2,2024-07-27T22:00Z,Co-op Live,1 Sportcity Way,Manchester,,England,14
+600043635,UFC Fight Night: Sandhagen vs. Nurmagomedov,2024-08-03T16:00Z,Etihad Arena,,Abu Dhabi,,United Arab Emirates,13
+600048251,UFC Fight Night: Tybura vs. Spivac 2,2024-08-10T20:00Z,UFC APEX,,Las Vegas,NV,USA,10
+600047624,"Dana White's Contender Series: Season 8, Week 1",2024-08-13T23:00Z,UFC APEX,,Las Vegas,NV,USA,5
+600044293,UFC 305: Du Plessis vs. Adesanya,2024-08-17T22:30Z,RAC Arena (AUS),,Perth,WA,Australia,12
+600047773,"Dana White's Contender Series: Season 8, Week 2",2024-08-20T23:00Z,UFC APEX,,Las Vegas,NV,USA,5
+600048324,UFC Fight Night: Cannonier vs. Borralho,2024-08-24T23:00Z,UFC APEX,,Las Vegas,NV,USA,11
+600047774,"Dana White's Contender Series: Season 8, Week 3",2024-08-28T00:00Z,UFC APEX,,Las Vegas,NV,USA,5
+600047775,"Dana White's Contender Series: Season 8, Week 4",2024-09-04T00:00Z,UFC APEX,,Las Vegas,NV,USA,5
+600046942,UFC Fight Night: Burns vs. Brady,2024-09-07T20:00Z,UFC APEX,,Las Vegas,NV,USA,12
+600047776,"Dana White's Contender Series: Season 8, Week 5",2024-09-11T00:00Z,UFC APEX,,Las Vegas,NV,USA,4
+600039853,UFC 306 – Riyadh Season Noche UFC: O’Malley vs. Dvalishvili,2024-09-14T23:30Z,Sphere,,Las Vegas,NV,USA,10
+600047777,"Dana White's Contender Series: Season 8, Week 6",2024-09-18T00:00Z,UFC APEX,,Las Vegas,NV,USA,5
+600047778,"Dana White's Contender Series: Season 8, Week 7",2024-09-25T00:00Z,UFC APEX,,Las Vegas,NV,USA,5
+600045735,UFC Fight Night: Moicano vs. Saint Denis,2024-09-28T16:00Z,Accor Arena,,Paris,,France,14
+600047779,"Dana White's Contender Series: Season 8, Week 8",2024-10-02T00:00Z,UFC APEX,,Las Vegas,NV,USA,5
+600048801,UFC 307: Pereira vs. Rountree Jr.,2024-10-05T22:30Z,Delta Center,,Salt Lake City,UT,USA,12
+600047780,"Dana White's Contender Series: Season 8, Week 9",2024-10-09T00:00Z,UFC APEX,,Las Vegas,NV,USA,5
+600049121,UFC Fight Night: Royval vs. Taira,2024-10-12T20:00Z,UFC APEX,,Las Vegas,NV,USA,12
+600047781,"Dana White's Contender Series: Season 8, Week 10",2024-10-16T00:00Z,UFC APEX,,Las Vegas,NV,USA,5
+600049122,UFC Fight Night: Hernandez vs. Pereira,2024-10-19T20:00Z,UFC APEX,,Las Vegas,NV,USA,11
+600044733,UFC 308: Topuria vs. Holloway,2024-10-26T14:00Z,Etihad Arena,,Abu Dhabi,,United Arab Emirates,13
+600048961,UFC Fight Night: Moreno vs. Albazi,2024-11-02T21:00Z,Rogers Place,,Edmonton,AB,Canada,13
+600049123,UFC Fight Night: Magny vs. Prates,2024-11-09T21:00Z,UFC APEX,,Las Vegas,NV,USA,11
+600049124,UFC 309: Jones vs. Miocic,2024-11-16T23:00Z,Madison Square Garden,"Madison Square Garden, Two Pennsylvania Plaza",New York,NY,USA,12
+600048962,UFC Fight Night: Yan vs. Figueiredo,2024-11-23T08:00Z,Galaxy Arena,,Cotai,,Macau,13
+600049125,UFC 310: Pantoja vs. Asakura,2024-12-07T23:00Z,T-Mobile Arena,3780 South Las Vegas Boulevard,Las Vegas,NV,USA,14
+600049126,UFC Fight Night: Covington vs. Buckley,2024-12-15T00:00Z,Amalie Arena,401 Channelside Drive,Tampa,FL,USA,13
+600051441,UFC Fight Night: Dern vs Ribas 2,2025-01-11T21:00Z,UFC APEX,,Las Vegas,NV,USA,14
+600051442,UFC 311: Makhachev vs. Moicano,2025-01-18T23:00Z,Intuit Dome,3930 West Century Boulevard,Inglewood,CA,USA,13
+600051443,UFC Fight Night: Adesanya vs. Imavov,2025-02-01T14:00Z,anb Arena,,Riyadh,,Saudi Arabia,11
+600050481,UFC 312: Du Plessis vs. Strickland 2,2025-02-08T23:30Z,Qudos Bank Arena,,Sydney,NSW,Australia,12
+600051444,UFC Fight Night: Cannonier vs. Rodrigues,2025-02-15T21:00Z,UFC APEX,,Las Vegas,NV,USA,12
+600051445,UFC Fight Night: Cejudo vs. Song,2025-02-22T23:00Z,Climate Pledge Arena,334 1st Ave. N.,Seattle,WA,USA,12
+600051446,UFC Fight Night: Kape vs. Almabayev,2025-03-01T21:30Z,UFC APEX,,Las Vegas,NV,USA,10
+600051447,UFC 313: Pereira vs. Ankalaev,2025-03-08T23:00Z,T-Mobile Arena,3780 South Las Vegas Boulevard,Las Vegas,NV,USA,10
+600051448,UFC Fight Night: Vettori vs. Dolidze 2,2025-03-15T20:00Z,UFC APEX,,Las Vegas,NV,USA,13
+600051194,UFC Fight Night: Edwards vs. Brady,2025-03-22T17:00Z,O2 Arena (ENG),,London,,England,13
+600051449,UFC Fight Night: Moreno vs. Erceg,2025-03-29T20:00Z,Mexico City Arena,,Mexico City,,Mexico,12
+600053226,UFC Fight Night: Emmett vs. Murphy,2025-04-05T22:00Z,UFC APEX,,Las Vegas,NV,USA,12
+600053165,UFC 314: Volkanovski vs. Lopes,2025-04-12T22:00Z,Kaseya Center,"AMERICAN AIRLINES ARENA,  601 BISCAYNE BLVD.",Miami,FL,USA,13
+600053312,UFC Fight Night: Machado Garry vs. Prates,2025-04-26T22:00Z,T-Mobile Center,,Kansas City,MO,USA,14
+600053455,UFC Fight Night: Sandhagen vs. Figueiredo,2025-05-03T23:00Z,Wells Fargo Arena,233 Center Street,Des Moines,IA,USA,12
+600053073,UFC 315: Muhammad vs. Della Maddalena,2025-05-10T22:00Z,Bell Centre,"BELL CENTRE,  1260 RUE DE LA",Montreal,PQ,Canada,12
+600053676,UFC Fight Night: Burns vs. Morales,2025-05-17T20:00Z,UFC APEX,,Las Vegas,NV,USA,11
+600053606,UFC Fight Night: Blanchfield vs. Barber,2025-05-31T22:30Z,UFC APEX,,Las Vegas,NV,USA,9
+600053672,UFC 316: Dvalishvili vs. O'Malley 2,2025-06-07T22:00Z,Prudential Center,165 MULBERRY STREET,Newark,NJ,USA,13
+600053732,UFC Fight Night: Usman vs. Buckley,2025-06-14T23:00Z,State Farm Arena,1 Philips Drive,Atlanta,GA,USA,13
+600053795,UFC Fight Night: Hill vs. Rountree Jr.,2025-06-21T16:00Z,Baku Crystal Hall,,Baku,,Azerbaijan,12
+600053168,UFC 317: Topuria vs. Oliveira,2025-06-28T23:00Z,T-Mobile Arena,3780 South Las Vegas Boulevard,Las Vegas,NV,USA,11
+600054061,UFC Fight Night: Lewis vs. Teixeira,2025-07-12T22:00Z,Bridgestone Arena,501 Broadway,Nashville,TN,USA,12
+600053891,UFC 318: Holloway vs. Poirier 3,2025-07-19T22:00Z,Smoothie King Center,1660 GIROD ST.,New Orleans,LA,USA,14
+600053545,UFC Fight Night: Whittaker vs. de Ridder,2025-07-26T16:00Z,Etihad Arena,,Abu Dhabi,,United Arab Emirates,12
+600054244,UFC Fight Night: Taira vs. Park,2025-08-02T22:00Z,UFC APEX,,Las Vegas,NV,USA,12
+600054396,UFC Fight Night: Dolidze vs. Hernandez,2025-08-09T20:00Z,UFC APEX,,Las Vegas,NV,USA,12
+600055020,"Dana White's Contender Series: Season 9, Week 1",2025-08-12T23:00Z,UFC APEX,,Las Vegas,NV,USA,5
+600054045,UFC 319: Du Plessis vs. Chimaev,2025-08-16T22:30Z,United Center,"UNITED CENTER,  1901 W. MADISON ST.",Chicago,IL,USA,12
+600055021,"Dana White's Contender Series: Season 9, Week 2",2025-08-20T00:00Z,UFC APEX,,Las Vegas,NV,USA,5
+600054141,UFC Fight Night: Walker vs. Zhang,2025-08-23T07:00Z,Mercedes-Benz Arena,,Shanghai,,China,12
