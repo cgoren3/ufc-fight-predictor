@@ -124,25 +124,29 @@ def _read_best_fights_for_coverage(raw: Path) -> tuple[pd.DataFrame | None, Path
     return fights, path
 
 
-def _read_best_optional_csv(raw: Path, filename: str, label: str) -> pd.DataFrame | None:
+def _read_best_optional_csv(raw: Path, filename: str, label: str) -> tuple[pd.DataFrame | None, Path | None]:
     direct = read_optional_csv(raw / filename, label=label)
     if direct is not None and not direct.empty:
-        return direct
+        return direct, raw / filename
     imported = read_optional_csv(raw / "imports" / filename, label=label)
     if imported is not None and not imported.empty:
-        return imported
-    return direct if direct is not None else imported
+        return imported, raw / "imports" / filename
+    frame = direct if direct is not None else imported
+    path = raw / filename if direct is not None else raw / "imports" / filename if imported is not None else None
+    return frame, path
 
 
 def build_data_quality_coverage(raw_dir: str | Path | None = None) -> dict[str, Any]:
     raw = Path(raw_dir) if raw_dir else settings.raw_data_dir
     fights, fights_path = _read_best_fights_for_coverage(raw)
-    odds = _read_best_optional_csv(raw, "odds.csv", "odds CSV")
-    scorecards = _read_best_optional_csv(raw, "scorecards.csv", "scorecards CSV")
+    odds, odds_path = _read_best_optional_csv(raw, "odds.csv", "odds CSV")
+    scorecards, scorecards_path = _read_best_optional_csv(raw, "scorecards.csv", "scorecards CSV")
     if fights is None or fights.empty:
         return {
             "fights": 0,
             "coverage_source": "",
+            "odds_source": "",
+            "scorecards_source": "",
             "known_weight_class_pct": 0.0,
             "known_event_location_pct": 0.0,
             "known_main_event_pct": 0.0,
@@ -164,6 +168,8 @@ def build_data_quality_coverage(raw_dir: str | Path | None = None) -> dict[str, 
     return {
         "fights": int(total),
         "coverage_source": str(fights_path) if fights_path else "",
+        "odds_source": str(odds_path) if odds_path else "",
+        "scorecards_source": str(scorecards_path) if scorecards_path else "",
         "known_weight_class_count": known_weight,
         "known_weight_class_pct": _percent(known_weight, total),
         "known_event_location_count": known_location,
@@ -198,9 +204,9 @@ def build_performance_report(
     dropped = feature_summary.get("dropped_all_null_features", [])
     if dropped:
         known_missing.append(f"All-null features dropped during training: {', '.join(dropped)}")
-    if summary.get("scorecards_row_count", 0) == 0:
+    if coverage.get("scorecard_matched_fights", 0) == 0:
         known_missing.append("No scorecard rows are currently loaded.")
-    if not (raw / "odds.csv").exists():
+    if coverage.get("odds_matched_fights", 0) == 0:
         known_missing.append("No odds.csv is currently loaded for market comparison.")
     if coverage.get("known_weight_class_pct", 0.0) < 50.0:
         known_missing.append("Most fights are missing known weight_class values.")

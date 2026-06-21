@@ -444,13 +444,60 @@ def import_odds(
 ) -> None:
     from ufc_predictor.data_io import InputDataError
     from ufc_predictor.odds import import_odds_csv
+    from ufc_predictor.reporting import build_data_quality_coverage
 
     try:
         frame = import_odds_csv(import_path=import_path, output_path=output_path)
     except InputDataError as exc:
         _runtime_error(f"Odds import failed:\n{exc}")
     _print(f"Imported {len(frame)} odds rows to {output_path}")
-    _print("Converted American odds to implied probabilities for analysis only. This is not betting advice.")
+    valid = int(pd.to_numeric(frame.get("fighter_a_no_vig_probability"), errors="coerce").notna().sum())
+    _print(f"Valid market probability rows: {valid}")
+    coverage = build_data_quality_coverage(output_path.parent)
+    _print(f"Odds coverage: {coverage.get('odds_matched_fights', 0)}/{coverage.get('fights', 0)} ({coverage.get('odds_coverage_pct', 0.0):.1f}%)")
+    _print("Converted American odds to implied probabilities for model-vs-market analysis only.")
+
+
+@app.command("extract-odds")
+def extract_odds(
+    source_dir: Path = typer.Option(settings.raw_data_dir / "enrichment_sources", help="Directory containing external source CSVs."),
+    output_path: Path = typer.Option(settings.raw_data_dir / "imports" / "odds.csv", help="Extracted odds import CSV output path."),
+) -> None:
+    from ufc_predictor.source_extractors import extract_odds_from_sources
+
+    frame, report = extract_odds_from_sources(source_dir=source_dir, output_path=output_path)
+    _print(f"Searched enrichment directory: {source_dir.resolve()}")
+    _print(f"Source files scanned: {report.source_files_scanned}")
+    _print(f"Source files used: {len(report.source_files_used)}")
+    for path in report.source_files_used:
+        _print(f"- {path}")
+    _print(f"Rows written: {report.rows_written}")
+    _print(f"Skipped rows: {report.skipped_rows}")
+    _print(f"Output path: {report.output_path}")
+    for warning in report.warnings:
+        _print(f"[yellow]Warning: {warning}[/yellow]")
+    if frame.empty:
+        raise typer.Exit(1)
+
+
+@app.command("extract-scorecards")
+def extract_scorecards(
+    source_dir: Path = typer.Option(settings.raw_data_dir / "enrichment_sources", help="Directory containing external source CSVs."),
+    output_path: Path = typer.Option(settings.raw_data_dir / "imports" / "scorecards.csv", help="Extracted scorecards import CSV output path."),
+) -> None:
+    from ufc_predictor.source_extractors import extract_scorecards_from_sources
+
+    frame, report = extract_scorecards_from_sources(source_dir=source_dir, output_path=output_path)
+    _print(f"Searched enrichment directory: {source_dir.resolve()}")
+    _print(f"Source files scanned: {report.source_files_scanned}")
+    _print(f"Source files used: {len(report.source_files_used)}")
+    for path in report.source_files_used:
+        _print(f"- {path}")
+    _print(f"Rows written: {report.rows_written}")
+    _print(f"Skipped rows: {report.skipped_rows}")
+    _print(f"Output path: {report.output_path}")
+    if frame.empty:
+        raise typer.Exit(1)
 
 
 @app.command("dataset-columns")
@@ -560,11 +607,12 @@ def data_summary(
 
 @app.command("load-scorecards")
 def load_scorecards(
-    csv_path: Path = typer.Argument(..., help="Manual official UFC scorecard CSV."),
+    csv_path: Path = typer.Argument(settings.raw_data_dir / "imports" / "scorecards.csv", help="Manual or extracted scorecard CSV."),
 ) -> None:
     from ufc_predictor.ingest.scorecards_loader import import_scorecards
 
     frame = import_scorecards(csv_path)
+    _print(f"Scorecards file read: {csv_path}")
     _print(f"Imported {len(frame)} scorecard rows.")
 
 
@@ -770,11 +818,31 @@ def report(
             f"- known title_fight: {coverage.get('known_title_fight_count', 0)}/{coverage.get('fights', 0)} "
             f"({coverage.get('known_title_fight_pct', 0.0):.1f}%)"
         )
-        _print(f"- odds coverage: {coverage.get('odds_coverage_pct', 0.0):.1f}%")
-        _print(f"- scorecard coverage: {coverage.get('scorecard_coverage_pct', 0.0):.1f}%")
+        if coverage.get("odds_source"):
+            _print(f"- odds source: {coverage.get('odds_source')}")
+        _print(
+            f"- odds coverage: {coverage.get('odds_matched_fights', 0)}/{coverage.get('fights', 0)} "
+            f"({coverage.get('odds_coverage_pct', 0.0):.1f}%)"
+        )
+        if coverage.get("scorecards_source"):
+            _print(f"- scorecards source: {coverage.get('scorecards_source')}")
+        _print(
+            f"- scorecard coverage: {coverage.get('scorecard_matched_fights', 0)}/{coverage.get('fights', 0)} "
+            f"({coverage.get('scorecard_coverage_pct', 0.0):.1f}%)"
+        )
     _print(f"Train accuracy: {train_metrics.get('accuracy')}")
     _print(f"Backtest accuracy: {backtest_metrics.get('accuracy')}")
     _print(f"Backtest calibration error: {backtest_metrics.get('expected_calibration_error')}")
+    model_vs_market = backtest_metrics.get("model_vs_market", {})
+    if model_vs_market:
+        _print("Model-vs-market analysis:")
+        _print(f"- matched rows: {model_vs_market.get('count', 0)}")
+        if "mean_model_probability" in model_vs_market:
+            _print(f"- mean model_probability: {model_vs_market.get('mean_model_probability')}")
+        if "mean_market_implied_probability" in model_vs_market:
+            _print(f"- mean market_implied_probability: {model_vs_market.get('mean_market_implied_probability')}")
+        if "mean_difference_vs_market" in model_vs_market:
+            _print(f"- mean difference_vs_market: {model_vs_market.get('mean_difference_vs_market')}")
     for issue in payload.get("known_missing_data_issues", []):
         _print(f"[yellow]Missing data issue: {issue}[/yellow]")
     _print(f"Wrote performance report to {path}")

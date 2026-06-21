@@ -28,6 +28,17 @@ REQUIRED_COLUMNS = [
     "decision_type",
 ]
 
+RAW_SCORECARD_COLUMNS = [
+    "event",
+    "fight_date",
+    "fighter_a",
+    "fighter_b",
+    "winner",
+    "card_type",
+    "raw_scorecards",
+    "source_file",
+]
+
 MMA_DECISIONS_OPTIONAL_COLUMNS = [
     "event",
     "fight_date",
@@ -56,10 +67,21 @@ def load_scorecards_csv(path: str | Path) -> pd.DataFrame:
     """Load manually downloaded official scorecard data from CSV."""
 
     frame = pd.read_csv(path)
-    missing = [column for column in REQUIRED_COLUMNS if column not in frame.columns]
-    if missing:
+    if set(REQUIRED_COLUMNS) <= set(frame.columns):
+        frame = frame.copy()
+    elif {"fight_date", "fighter_a", "fighter_b", "raw_scorecards"} <= set(frame.columns):
+        for column in REQUIRED_COLUMNS:
+            if column not in frame.columns:
+                frame[column] = pd.NA
+        if "event" not in frame.columns:
+            frame["event"] = ""
+        frame["judge"] = frame["judge"].fillna("raw_scorecards")
+        frame["decision_type"] = frame["decision_type"].fillna(frame.get("card_type", pd.Series([""] * len(frame))))
+    else:
+        missing = [column for column in REQUIRED_COLUMNS if column not in frame.columns]
         raise ValueError(f"Scorecard CSV is missing columns: {', '.join(missing)}")
-    frame = frame[REQUIRED_COLUMNS].copy()
+    optional = [column for column in RAW_SCORECARD_COLUMNS if column in frame.columns and column not in REQUIRED_COLUMNS]
+    frame = frame[REQUIRED_COLUMNS + optional].copy()
     frame["fight_date"] = pd.to_datetime(frame["fight_date"], errors="coerce").dt.date.astype("string")
     numeric_columns = [column for column in REQUIRED_COLUMNS if column.startswith("round_") or column.startswith("total_")]
     for column in numeric_columns:
@@ -69,7 +91,7 @@ def load_scorecards_csv(path: str | Path) -> pd.DataFrame:
 
 def import_scorecards(path: str | Path, db_path: str | Path | None = None) -> pd.DataFrame:
     frame = load_scorecards_csv(path)
-    write_dataframe(frame, "scorecards", db_path=db_path, if_exists="append")
+    write_dataframe(frame[REQUIRED_COLUMNS], "scorecards", db_path=db_path, if_exists="append")
     return frame
 
 

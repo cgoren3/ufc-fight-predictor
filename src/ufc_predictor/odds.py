@@ -20,6 +20,12 @@ ODDS_COLUMNS = [
 ]
 
 
+def _is_missing(value: Any) -> bool:
+    if value is None or pd.isna(value):
+        return True
+    return str(value).strip().lower() in {"", "nan", "none", "null"}
+
+
 def _normal(value: Any) -> str:
     if value is None or pd.isna(value):
         return ""
@@ -40,6 +46,14 @@ def american_odds_to_implied_probability(odds: Any) -> float | None:
     return abs(value) / (abs(value) + 100.0)
 
 
+def is_valid_american_odds(odds: Any) -> bool:
+    value = pd.to_numeric(pd.Series([odds]), errors="coerce").iloc[0]
+    if pd.isna(value):
+        return False
+    value = float(value)
+    return value != 0 and value == int(value) and abs(value) >= 100.0
+
+
 def import_odds_csv(
     import_path: str | Path | None = None,
     output_path: str | Path | None = None,
@@ -51,13 +65,20 @@ def import_odds_csv(
     except InputDataError:
         raise
     frame = pd.read_csv(source)
+    invalid_rows = []
+    for column in ["fighter_a_odds", "fighter_b_odds"]:
+        for index, value in frame[column].items():
+            if not _is_missing(value) and not is_valid_american_odds(value):
+                invalid_rows.append(f"row {index + 2} {column}={value!r}")
+    if invalid_rows:
+        raise InputDataError("Invalid American odds values: " + "; ".join(invalid_rows[:10]))
     frame["fight_date"] = pd.to_datetime(frame["fight_date"], errors="coerce").dt.date.astype("string")
     frame["fighter_a_implied_probability"] = frame["fighter_a_odds"].map(american_odds_to_implied_probability)
     frame["fighter_b_implied_probability"] = frame["fighter_b_odds"].map(american_odds_to_implied_probability)
     frame["market_probability_sum"] = frame["fighter_a_implied_probability"].fillna(0.0) + frame[
         "fighter_b_implied_probability"
     ].fillna(0.0)
-    valid_sum = frame["market_probability_sum"] > 0
+    valid_sum = frame["fighter_a_implied_probability"].notna() & frame["fighter_b_implied_probability"].notna()
     frame.loc[valid_sum, "fighter_a_no_vig_probability"] = (
         frame.loc[valid_sum, "fighter_a_implied_probability"] / frame.loc[valid_sum, "market_probability_sum"]
     )
@@ -133,6 +154,8 @@ def attach_odds_features(dataset: pd.DataFrame, odds: pd.DataFrame | None) -> pd
             "fighter_b_no_vig_probability",
             "market_probability_sum",
             "timestamp",
+            "event",
+            "source_file",
         ]
         if column in merged.columns
     ]

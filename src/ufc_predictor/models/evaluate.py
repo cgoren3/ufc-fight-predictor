@@ -88,14 +88,19 @@ def _metadata_group(metadata: pd.DataFrame, y_true: np.ndarray, y_pred: np.ndarr
 
 
 def _underdog_performance(metadata: pd.DataFrame, y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:
-    favorite_is_a = metadata["closing_odds_favorite_is_a"].astype(bool).to_numpy()
-    model_picked_a = y_pred.astype(bool)
+    favorite = metadata["closing_odds_favorite_is_a"].astype("boolean")
+    valid = favorite.notna().to_numpy()
+    if not valid.any():
+        return {"count": 0.0, "accuracy": float("nan")}
+    favorite_is_a = favorite.loc[valid].astype(bool).to_numpy()
+    model_picked_a = y_pred[valid].astype(bool)
+    target = y_true[valid]
     underdog_mask = favorite_is_a != model_picked_a
     if not underdog_mask.any():
         return {"count": 0.0, "accuracy": float("nan")}
     return {
         "count": float(underdog_mask.sum()),
-        "accuracy": float((y_true[underdog_mask] == y_pred[underdog_mask]).mean()),
+        "accuracy": float((target[underdog_mask] == y_pred[valid][underdog_mask]).mean()),
     }
 
 
@@ -112,13 +117,14 @@ def _model_vs_market(metadata: pd.DataFrame, y_true: np.ndarray, y_prob: np.ndar
     return {
         "count": float(valid.sum()),
         "mean_model_probability": float(np.mean(model_prob)),
-        "mean_market_probability": float(np.mean(market_prob)),
+        "mean_market_implied_probability": float(np.mean(market_prob)),
+        "mean_difference_vs_market": float(np.mean(model_prob - market_prob)),
         "mean_absolute_probability_delta": float(np.mean(np.abs(model_prob - market_prob))),
         "model_accuracy": float((model_pred == target).mean()),
         "market_accuracy": float((market_pred == target).mean()),
         "model_log_loss": float(-(target * np.log(_clip_probs(model_prob)) + (1 - target) * np.log(1 - _clip_probs(model_prob))).mean()),
         "market_log_loss": float(-(target * np.log(market_prob) + (1 - target) * np.log(1 - market_prob)).mean()),
-        "note": "Model-vs-market edge is analytical only and is not betting advice.",
+        "note": "Model-vs-market comparison is analytical only.",
     }
 
 
@@ -212,6 +218,11 @@ def rolling_backtest(
             for column in BACKTEST_METADATA_COLUMNS:
                 if column in item.index:
                     row[column] = item.get(column)
+            row["model_probability"] = prob
+            market = pd.to_numeric(pd.Series([item.get("market_fighter_a_implied_probability")]), errors="coerce").iloc[0]
+            if not pd.isna(market):
+                row["market_implied_probability"] = float(market)
+                row["difference_vs_market"] = float(prob - market)
             rows.append(row)
         if progress_callback is not None:
             progress_callback(

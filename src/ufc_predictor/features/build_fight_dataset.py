@@ -25,6 +25,12 @@ METADATA_COLUMNS = {
     "winner",
     "target",
     "fighter_a_win",
+    "market_fighter_a_implied_probability",
+    "market_fighter_b_implied_probability",
+    "closing_odds_favorite_is_a",
+    "model_probability",
+    "market_implied_probability",
+    "difference_vs_market",
     "max_history_date_used",
     "source_url",
 }
