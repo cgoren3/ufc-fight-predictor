@@ -15,7 +15,7 @@ from ufc_predictor.config import settings
 from ufc_predictor.data_sources import read_source_metadata
 from ufc_predictor.features.build_fight_dataset import feature_columns
 from ufc_predictor.models.calibrate import calibrate_estimator
-from ufc_predictor.models.evaluate import baseline_metrics, evaluate_predictions
+from ufc_predictor.models.evaluate import baseline_metrics, evaluate_predictions, tune_market_blend_weight
 
 
 @dataclass
@@ -263,6 +263,20 @@ def train_ensemble(
     )
     metrics: dict[str, Any] = {"baselines": baseline_metrics(dataset)}
     metrics["feature_summary"] = selection.as_dict()
+    if "market_fighter_a_implied_probability" in train_frame.columns:
+        train_probabilities = bundle.predict_proba(train_frame[columns])[:, 1]
+        metrics["market_blend_training_window"] = tune_market_blend_weight(
+            train_frame["fighter_a_win"],
+            train_probabilities,
+            pd.to_numeric(train_frame["market_fighter_a_implied_probability"], errors="coerce"),
+        )
+    if "market_fighter_a_implied_probability" in dataset.columns:
+        historical_probabilities = bundle.predict_proba(dataset[columns])[:, 1]
+        metrics["market_blend"] = tune_market_blend_weight(
+            dataset["fighter_a_win"],
+            historical_probabilities,
+            pd.to_numeric(dataset["market_fighter_a_implied_probability"], errors="coerce"),
+        )
     if not test_frame.empty and test_frame["fighter_a_win"].nunique() >= 1:
         probabilities = bundle.predict_proba(test_frame[columns])[:, 1]
         metrics.update(evaluate_predictions(test_frame["fighter_a_win"], probabilities, metadata=test_frame))

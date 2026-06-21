@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Optional
 
@@ -58,10 +59,13 @@ TINY_DATASET_WARNING_THRESHOLD = 500
 
 
 def _print(message: str) -> None:
+    text = str(message)
     if console is not None:
-        console.print(message)
+        encoding = getattr(console.file, "encoding", None) or "utf-8"
+        safe_text = text.encode(encoding, errors="replace").decode(encoding, errors="replace")
+        console.print(safe_text)
     else:  # pragma: no cover - only used without CLI deps
-        print(message)
+        print(text)
 
 
 def _print_json(data: dict) -> None:
@@ -443,8 +447,8 @@ def import_odds(
     output_path: Path = typer.Option(settings.raw_data_dir / "odds.csv", help="Normalized odds CSV output path."),
 ) -> None:
     from ufc_predictor.data_io import InputDataError
-    from ufc_predictor.odds import import_odds_csv
-    from ufc_predictor.reporting import build_data_quality_coverage
+    from ufc_predictor.odds import import_odds_csv, odds_coverage_report
+    from ufc_predictor.reporting import _read_best_fights_for_coverage, build_data_quality_coverage
 
     try:
         frame = import_odds_csv(import_path=import_path, output_path=output_path)
@@ -455,6 +459,31 @@ def import_odds(
     _print(f"Valid market probability rows: {valid}")
     coverage = build_data_quality_coverage(output_path.parent)
     _print(f"Odds coverage: {coverage.get('odds_matched_fights', 0)}/{coverage.get('fights', 0)} ({coverage.get('odds_coverage_pct', 0.0):.1f}%)")
+    fights, fights_path = _read_best_fights_for_coverage(output_path.parent)
+    if fights is not None and not fights.empty:
+        report = odds_coverage_report(fights, frame)
+        _print("Odds coverage report:")
+        _print(f"- fights source: {fights_path}")
+        _print(f"- raw odds rows found: {report.raw_odds_rows_found}")
+        _print(f"- odds rows parsed: {report.odds_rows_parsed}")
+        _print(f"- odds rows matched to fights: {report.odds_rows_matched}")
+        _print(f"- odds rows unmatched: {report.odds_rows_unmatched}")
+        _print(
+            f"- final odds coverage: {report.final_odds_coverage_count}/{report.fights_count} "
+            f"({report.final_odds_coverage_percent:.1f}%)"
+        )
+        if report.match_reasons:
+            _print("- match reasons:")
+            for reason, count in sorted(report.match_reasons.items()):
+                _print(f"  {reason}: {count}")
+        if report.unmatched_examples:
+            _print("- top unmatched examples:")
+            for example in report.unmatched_examples[:5]:
+                _print(
+                    "  "
+                    f"{example.get('fight_date')} | {example.get('fighter_a')} vs {example.get('fighter_b')} | "
+                    f"{example.get('reason')}"
+                )
     _print("Converted American odds to implied probabilities for model-vs-market analysis only.")
 
 
@@ -830,9 +859,30 @@ def report(
             f"- scorecard coverage: {coverage.get('scorecard_matched_fights', 0)}/{coverage.get('fights', 0)} "
             f"({coverage.get('scorecard_coverage_pct', 0.0):.1f}%)"
         )
+    market_analysis = payload.get("market_analysis", {})
+    if market_analysis:
+        _print("Market analysis settings:")
+        _print(f"- odds usage: {market_analysis.get('odds_usage')}")
+        thresholds = market_analysis.get("value_analysis_thresholds", {})
+        _print(
+            "- value-analysis thresholds: "
+            f"small={thresholds.get('small_potential_edge')}, "
+            f"medium={thresholds.get('medium_potential_edge')}, "
+            f"large={thresholds.get('large_potential_edge')}"
+        )
     _print(f"Train accuracy: {train_metrics.get('accuracy')}")
     _print(f"Backtest accuracy: {backtest_metrics.get('accuracy')}")
     _print(f"Backtest calibration error: {backtest_metrics.get('expected_calibration_error')}")
+    _print(f"Backtest model mode: {backtest_metrics.get('model_mode')}")
+    comparison = payload.get("model_mode_comparison", {})
+    if comparison:
+        _print("Mode comparison:")
+        _print(f"- pure model accuracy: {comparison.get('pure_model', {}).get('accuracy')}")
+        _print(f"- market-aware accuracy: {comparison.get('market_aware_model', {}).get('accuracy')}")
+        _print(
+            "- market-only accuracy on odds-covered fights: "
+            f"{comparison.get('market_only_on_odds_covered_fights', {}).get('accuracy')}"
+        )
     model_vs_market = backtest_metrics.get("model_vs_market", {})
     if model_vs_market:
         _print("Model-vs-market analysis:")
@@ -843,6 +893,10 @@ def report(
             _print(f"- mean market_implied_probability: {model_vs_market.get('mean_market_implied_probability')}")
         if "mean_difference_vs_market" in model_vs_market:
             _print(f"- mean difference_vs_market: {model_vs_market.get('mean_difference_vs_market')}")
+        if "model_log_loss" in model_vs_market:
+            _print(f"- model log loss: {model_vs_market.get('model_log_loss')}")
+        if "market_log_loss" in model_vs_market:
+            _print(f"- market log loss: {model_vs_market.get('market_log_loss')}")
     for issue in payload.get("known_missing_data_issues", []):
         _print(f"[yellow]Missing data issue: {issue}[/yellow]")
     _print(f"Wrote performance report to {path}")
@@ -869,6 +923,7 @@ def backtest(
     output: Path = typer.Option(settings.processed_data_dir / "backtest_results.json", help="Backtest JSON output."),
     min_train_fights: int = typer.Option(50, help="Minimum training rows before a rolling prediction."),
     step: str = typer.Option("YS", help="Pandas period frequency for rolling backtest, e.g. YS for yearly or MS for monthly."),
+    model_mode: str = typer.Option("pure", "--model-mode", help="Backtest mode: pure or market-aware."),
 ) -> None:
     from ufc_predictor.models.evaluate import rolling_backtest, save_backtest_result
     from ufc_predictor.models.train import feature_selection_summary
@@ -889,11 +944,136 @@ def backtest(
         dataset,
         min_train_fights=min_train_fights,
         step=step,
+        model_mode=model_mode,
         progress_callback=print_backtest_progress,
     )
     path = save_backtest_result(metrics, output)
+    _print(f"Model mode: {metrics.get('model_mode', model_mode)}")
     _print(f"Wrote backtest metrics to {path}")
     _print_json(_metrics_for_console(metrics))
+
+
+@app.command("compare-model-modes")
+def compare_model_modes(
+    dataset_path: Path = typer.Option(_default_dataset_path(), help="Processed fight dataset."),
+    output: Path = typer.Option(settings.processed_data_dir / "model_mode_comparison.json", help="Comparison JSON output."),
+    min_train_fights: int = typer.Option(50, help="Minimum training rows before a rolling prediction."),
+    step: str = typer.Option("YS", help="Pandas period frequency for rolling backtest."),
+) -> None:
+    from ufc_predictor.models.evaluate import evaluate_predictions, rolling_backtest
+
+    dataset = _read_dataset(dataset_path)
+    _print("Running pure model rolling backtest...")
+    pure = rolling_backtest(dataset, min_train_fights=min_train_fights, step=step, model_mode="pure")
+    _print("Running market-aware rolling backtest...")
+    market_aware = rolling_backtest(dataset, min_train_fights=min_train_fights, step=step, model_mode="market-aware")
+
+    market_predictions = pd.DataFrame(market_aware.get("predictions", []))
+    market_only: dict = {"count": 0.0}
+    odds_covered: dict = {}
+    non_odds: dict = {}
+    if not market_predictions.empty and "market_implied_probability" in market_predictions.columns:
+        market_probs = pd.to_numeric(market_predictions["market_implied_probability"], errors="coerce")
+        valid = market_probs.notna()
+        if valid.any():
+            market_only = evaluate_predictions(
+                market_predictions.loc[valid, "target"],
+                market_probs.loc[valid],
+                metadata=market_predictions.loc[valid],
+            )
+            odds_covered = evaluate_predictions(
+                market_predictions.loc[valid, "target"],
+                market_predictions.loc[valid, "final_probability_used"],
+                metadata=market_predictions.loc[valid],
+            )
+        if (~valid).any():
+            non_odds = evaluate_predictions(
+                market_predictions.loc[~valid, "target"],
+                market_predictions.loc[~valid, "final_probability_used"],
+                metadata=market_predictions.loc[~valid],
+            )
+
+    comparison = {
+        "pure_model": _metrics_for_console(pure),
+        "market_aware_model": _metrics_for_console(market_aware),
+        "market_only_on_odds_covered_fights": _metrics_for_console(market_only),
+        "market_aware_on_odds_covered_fights": _metrics_for_console(odds_covered),
+        "market_aware_on_non_odds_fights": _metrics_for_console(non_odds),
+        "note": "Market comparison is analytical only.",
+    }
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(comparison, indent=2, default=str), encoding="utf-8")
+    _print("Model mode comparison")
+    _print(f"- pure model accuracy: {pure.get('accuracy')}")
+    _print(f"- market-aware model accuracy: {market_aware.get('accuracy')}")
+    _print(f"- market-only accuracy on odds-covered fights: {market_only.get('accuracy')}")
+    _print(f"- market-aware log loss: {market_aware.get('log_loss')}")
+    _print(f"- market-aware Brier score: {market_aware.get('brier_score')}")
+    _print(f"- market-aware calibration error: {market_aware.get('expected_calibration_error')}")
+    _print(f"Wrote model mode comparison to {output}")
+
+
+def _ablation_groups() -> dict[str, list[str]]:
+    return {
+        "odds_features": ["market_", "closing_odds_"],
+        "scorecard_history_features": ["scorecard", "decision", "judge_disagreement", "average_rounds_won"],
+        "enrichment_features": ["weight_class", "event_location", "main_event", "title_fight", "scheduled_rounds"],
+        "style_features": ["style", "stance", "reach", "striker", "grappler", "pressure", "counter", "wrestling", "clash"],
+        "elo_opponent_adjusted_features": ["elo", "opponent_adjusted", "opponent_elo", "strength_of_schedule", "best_win", "worst_loss"],
+        "recent_form_features": ["last_", "recent_", "streak", "days_since", "fights_past", "layoff", "turnaround", "trend"],
+    }
+
+
+def _drop_group_columns(dataset: pd.DataFrame, patterns: list[str]) -> tuple[pd.DataFrame, list[str]]:
+    protected = {"fight_date", "fighter_a", "fighter_b", "fighter_a_win", "winner", "target", "fight_id", "event_id", "event_name"}
+    lowered_patterns = [pattern.lower() for pattern in patterns]
+    drop_columns = [
+        column
+        for column in dataset.columns
+        if column not in protected and any(pattern in column.lower() for pattern in lowered_patterns)
+    ]
+    return dataset.drop(columns=drop_columns, errors="ignore"), drop_columns
+
+
+@app.command("ablation-report")
+def ablation_report(
+    dataset_path: Path = typer.Option(_default_dataset_path(), help="Processed fight dataset."),
+    output: Path = typer.Option(settings.processed_data_dir / "ablation_report.json", help="Ablation JSON output."),
+) -> None:
+    from ufc_predictor.models.train import train_ensemble
+
+    dataset = _read_dataset(dataset_path)
+    results: dict[str, dict] = {}
+    baseline = train_ensemble(dataset, save=False)
+    results["baseline"] = {
+        "validation_type": "chronological_holdout",
+        "dropped_columns": [],
+        "metrics": _metrics_for_console(baseline.metrics),
+    }
+    for group, patterns in _ablation_groups().items():
+        ablated, dropped_columns = _drop_group_columns(dataset, patterns)
+        try:
+            bundle = train_ensemble(ablated, save=False)
+            metrics = _metrics_for_console(bundle.metrics)
+        except Exception as exc:
+            metrics = {"error": f"{type(exc).__name__}: {exc}"}
+        results[group] = {
+            "validation_type": "chronological_holdout",
+            "dropped_columns": dropped_columns,
+            "dropped_column_count": len(dropped_columns),
+            "metrics": metrics,
+        }
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(results, indent=2, default=str), encoding="utf-8")
+    _print("Ablation report")
+    for group, payload in results.items():
+        metrics = payload.get("metrics", {})
+        _print(
+            f"- {group}: dropped={payload.get('dropped_column_count', 0)} "
+            f"accuracy={metrics.get('accuracy')} log_loss={metrics.get('log_loss')} "
+            f"calibration_error={metrics.get('expected_calibration_error')}"
+        )
+    _print(f"Wrote ablation report to {output}")
 
 
 @app.command("predict")
@@ -903,11 +1083,14 @@ def predict(
     date: str = typer.Option(..., "--date"),
     weight_class: str = typer.Option(..., "--weight-class"),
     scheduled_rounds: int = typer.Option(3, "--scheduled-rounds"),
+    model_mode: str = typer.Option("pure", "--model-mode", help="Prediction mode: pure or market-aware."),
+    show_value_analysis: bool = typer.Option(False, "--show-value-analysis", help="Show cautious market edge/value analysis when odds match."),
     model_path: Path = typer.Option(settings.model_dir / "ufc_predictor_model.pkl", help="Trained model path."),
     fights_csv: Path = typer.Option(settings.raw_data_dir / "fights.csv", help="Historical fights CSV."),
     fight_stats_csv: Path = typer.Option(settings.raw_data_dir / "fight_stats.csv", help="Optional fight stats CSV."),
     fighters_csv: Path = typer.Option(settings.raw_data_dir / "fighters.csv", help="Optional fighters CSV."),
-    scorecards_csv: Path = typer.Option(settings.external_data_dir / "scorecards.csv", help="Optional scorecards CSV."),
+    scorecards_csv: Path = typer.Option(settings.raw_data_dir / "scorecards.csv", help="Optional scorecards CSV."),
+    odds_csv: Path = typer.Option(settings.raw_data_dir / "odds.csv", help="Optional odds CSV for market-aware predictions."),
 ) -> None:
     from ufc_predictor.models.predict import predict_fight
 
@@ -917,6 +1100,7 @@ def predict(
     fight_stats = read_optional_csv(fight_stats_csv, label="fight stats CSV")
     fighters = read_optional_csv(fighters_csv, label="fighters CSV")
     scorecards = read_optional_csv(scorecards_csv, label="scorecards CSV")
+    odds = read_optional_csv(odds_csv, label="odds CSV")
     model = model_path if model_path.exists() else None
     prediction = predict_fight(
         model=model,
@@ -929,6 +1113,9 @@ def predict(
         fight_stats=fight_stats,
         fighters=fighters,
         scorecards=scorecards,
+        odds=odds,
+        model_mode=model_mode,
+        show_value_analysis=show_value_analysis,
     )
     _print_json(prediction)
 

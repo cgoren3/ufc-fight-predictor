@@ -30,6 +30,50 @@ def _clip_probs(y_prob: np.ndarray) -> np.ndarray:
     return np.clip(np.asarray(y_prob, dtype=float), 1e-6, 1.0 - 1e-6)
 
 
+def tune_market_blend_weight(
+    y_true: np.ndarray | pd.Series | list[float],
+    model_probability: np.ndarray | pd.Series | list[float],
+    market_probability: np.ndarray | pd.Series | list[float],
+    grid: np.ndarray | None = None,
+) -> dict[str, Any]:
+    """Tune blend weight on a past-only training window.
+
+    The returned weight is the model share in:
+    w * model_probability + (1 - w) * market_probability.
+    """
+
+    y = np.asarray(y_true, dtype=int)
+    model = np.asarray(model_probability, dtype=float)
+    market = np.asarray(market_probability, dtype=float)
+    valid = ~np.isnan(market)
+    if not valid.any():
+        return {"weight": 1.0, "rows_used": 0, "best_log_loss": float("nan")}
+    weights = np.linspace(0.0, 1.0, 21) if grid is None else grid
+    best_weight = 1.0
+    best_loss = float("inf")
+    for weight in weights:
+        blended = _clip_probs(weight * model[valid] + (1.0 - weight) * market[valid])
+        target = y[valid]
+        loss = float(-(target * np.log(blended) + (1 - target) * np.log(1 - blended)).mean())
+        if loss < best_loss:
+            best_loss = loss
+            best_weight = float(weight)
+    return {"weight": best_weight, "rows_used": int(valid.sum()), "best_log_loss": best_loss}
+
+
+def apply_market_blend(
+    model_probability: np.ndarray | pd.Series | list[float],
+    market_probability: np.ndarray | pd.Series | list[float],
+    weight: float,
+) -> np.ndarray:
+    model = np.asarray(model_probability, dtype=float)
+    market = np.asarray(market_probability, dtype=float)
+    blended = model.copy()
+    valid = ~np.isnan(market)
+    blended[valid] = weight * model[valid] + (1.0 - weight) * market[valid]
+    return _clip_probs(blended)
+
+
 def evaluate_predictions(
     y_true: np.ndarray | pd.Series | list[float],
     y_prob: np.ndarray | pd.Series | list[float],
@@ -61,6 +105,7 @@ def evaluate_predictions(
         metrics["performance_by_year"] = _metadata_group(metadata, y_true_array, y_pred, "fight_year")
         metrics["performance_by_weight_class"] = _metadata_group(metadata, y_true_array, y_pred, "weight_class")
         metrics["performance_by_main_event"] = _metadata_group(metadata, y_true_array, y_pred, "main_event")
+        metrics["performance_by_modern_era"] = _modern_era_performance(metadata, y_true_array, y_pred)
         if "sex" in metadata.columns:
             metrics["performance_by_men_women"] = _metadata_group(metadata, y_true_array, y_pred, "sex")
         if "closing_odds_favorite_is_a" in metadata.columns:
@@ -102,6 +147,25 @@ def _underdog_performance(metadata: pd.DataFrame, y_true: np.ndarray, y_pred: np
         "count": float(underdog_mask.sum()),
         "accuracy": float((target[underdog_mask] == y_pred[valid][underdog_mask]).mean()),
     }
+
+
+def _modern_era_performance(metadata: pd.DataFrame, y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, dict[str, float]]:
+    if "fight_date" not in metadata.columns:
+        return {}
+    dates = pd.to_datetime(metadata["fight_date"], errors="coerce")
+    output: dict[str, dict[str, float]] = {
+        "all_years": {"count": float(len(y_true)), "accuracy": float((y_true == y_pred).mean()) if len(y_true) else float("nan")}
+    }
+    for start_year in [2015, 2020, 2022]:
+        mask = dates.dt.year.ge(start_year).fillna(False).to_numpy()
+        if not mask.any():
+            output[f"{start_year}+"] = {"count": 0.0, "accuracy": float("nan")}
+        else:
+            output[f"{start_year}+"] = {
+                "count": float(mask.sum()),
+                "accuracy": float((y_true[mask] == y_pred[mask]).mean()),
+            }
+    return output
 
 
 def _model_vs_market(metadata: pd.DataFrame, y_true: np.ndarray, y_prob: np.ndarray) -> dict[str, float | str]:
@@ -167,12 +231,16 @@ def rolling_backtest(
     min_train_fights: int = 50,
     step: str = "YS",
     model_dir: str | Path | None = None,
+    model_mode: str = "pure",
     progress_callback: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
     """Train on fights before each period and predict the next period."""
 
     if dataset.empty:
         return {}
+    mode = model_mode.strip().lower().replace("_", "-")
+    if mode not in {"pure", "market-aware"}:
+        raise ValueError("--model-mode must be either 'pure' or 'market-aware'.")
     from ufc_predictor.models.train import train_ensemble
 
     frame = dataset.sort_values("fight_date").copy()
@@ -210,19 +278,44 @@ def rolling_backtest(
                     "train_rows": len(train),
                     "test_rows": len(test),
                 }
-            )
+        )
         bundle = train_ensemble(train, model_dir=model_dir, save=False, test_fraction=0.0)
-        probs = bundle.predict_proba(test[bundle.feature_columns])[:, 1]
-        for (_, item), prob in zip(test.iterrows(), probs):
-            row = {"fight_id": item.get("fight_id"), "fight_date": item["fight_date"], "target": item["fighter_a_win"], "prob": prob}
+        pure_probs = bundle.predict_proba(test[bundle.feature_columns])[:, 1]
+        train_market = pd.to_numeric(train.get("market_fighter_a_implied_probability", pd.Series([np.nan] * len(train))), errors="coerce")
+        test_market = pd.to_numeric(test.get("market_fighter_a_implied_probability", pd.Series([np.nan] * len(test))), errors="coerce")
+        blend = {"weight": 1.0, "rows_used": 0, "best_log_loss": float("nan")}
+        final_probs = pure_probs
+        if mode == "market-aware":
+            valid_train_market = train_market.notna()
+            if valid_train_market.any():
+                train_probs = bundle.predict_proba(train.loc[valid_train_market, bundle.feature_columns])[:, 1]
+                blend = tune_market_blend_weight(
+                    train.loc[valid_train_market, "fighter_a_win"],
+                    train_probs,
+                    train_market.loc[valid_train_market],
+                )
+            final_probs = apply_market_blend(pure_probs, test_market, blend["weight"])
+        for (_, item), pure_prob, final_prob, market_prob in zip(test.iterrows(), pure_probs, final_probs, test_market):
+            row = {
+                "fight_id": item.get("fight_id"),
+                "fight_date": item["fight_date"],
+                "target": item["fighter_a_win"],
+                "prob": final_prob,
+                "pure_model_probability": pure_prob,
+                "final_probability_used": final_prob,
+                "model_mode": mode,
+                "blend_weight": blend.get("weight", 1.0),
+                "blend_rows_used": blend.get("rows_used", 0),
+            }
             for column in BACKTEST_METADATA_COLUMNS:
                 if column in item.index:
                     row[column] = item.get(column)
-            row["model_probability"] = prob
-            market = pd.to_numeric(pd.Series([item.get("market_fighter_a_implied_probability")]), errors="coerce").iloc[0]
-            if not pd.isna(market):
-                row["market_implied_probability"] = float(market)
-                row["difference_vs_market"] = float(prob - market)
+            row["model_probability"] = pure_prob
+            if not pd.isna(market_prob):
+                row["market_implied_probability"] = float(market_prob)
+                row["difference_vs_market"] = float(pure_prob - market_prob)
+                if mode == "market-aware":
+                    row["blended_probability"] = float(final_prob)
             rows.append(row)
         if progress_callback is not None:
             progress_callback(
@@ -241,6 +334,7 @@ def rolling_backtest(
     predictions = pd.DataFrame(rows)
     metrics = evaluate_predictions(predictions["target"], predictions["prob"], metadata=predictions)
     metrics["predictions"] = predictions.to_dict(orient="records")
+    metrics["model_mode"] = mode
     metrics["backtest_summary"] = {
         "step": step,
         "periods": len(period_pairs),

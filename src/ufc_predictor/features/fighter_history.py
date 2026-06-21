@@ -59,6 +59,13 @@ SNAPSHOT_NUMERIC_DEFAULTS: dict[str, float] = {
     "close_decision_rate": 0.0,
     "average_rounds_won_decisions": 0.0,
     "judge_disagreement_score": 0.0,
+    "prior_decision_win_rate": 0.0,
+    "prior_split_decision_rate": 0.0,
+    "prior_average_scorecard_margin": 0.0,
+    "prior_close_decision_rate": 0.0,
+    "prior_fights_gone_to_decision_rate": 0.0,
+    "prior_five_round_decision_experience": 0.0,
+    "prior_championship_main_event_decision_experience": 0.0,
     "ko_tko_win_rate": 0.0,
     "submission_win_rate": 0.0,
     "decision_win_rate": 0.0,
@@ -471,17 +478,62 @@ def _scorecard_features(scorecards: pd.DataFrame | None, fighter: str, as_of_dat
     if cards.empty:
         return {}
     is_a = cards["fighter_a"].map(_normal) == fighter_name
-    totals_for = np.where(is_a, pd.to_numeric(cards["total_a"], errors="coerce"), pd.to_numeric(cards["total_b"], errors="coerce"))
-    totals_against = np.where(is_a, pd.to_numeric(cards["total_b"], errors="coerce"), pd.to_numeric(cards["total_a"], errors="coerce"))
-    margins = pd.Series(totals_for - totals_against).dropna()
+    total_a = pd.to_numeric(cards["total_a"], errors="coerce") if "total_a" in cards.columns else pd.Series([np.nan] * len(cards), index=cards.index)
+    total_b = pd.to_numeric(cards["total_b"], errors="coerce") if "total_b" in cards.columns else pd.Series([np.nan] * len(cards), index=cards.index)
+    totals_for = np.where(is_a, total_a, total_b)
+    totals_against = np.where(is_a, total_b, total_a)
+    margins = pd.Series(totals_for - totals_against, index=cards.index).dropna()
+    if margins.empty and "raw_scorecards" in cards.columns:
+        raw_margins: list[float] = []
+        for raw_value, fighter_is_a in zip(cards["raw_scorecards"], is_a):
+            for first, second in _parse_raw_score_pairs(raw_value):
+                margin = first - second if fighter_is_a else second - first
+                raw_margins.append(float(margin))
+        margins = pd.Series(raw_margins, dtype=float).dropna()
     decision_type = cards.get("decision_type", pd.Series([""] * len(cards))).fillna("").str.lower()
-    judge_counts = cards.groupby(["event", "fighter_a", "fighter_b"]).size()
+    group_columns = [column for column in ["fight_date", "event", "fighter_a", "fighter_b"] if column in cards.columns]
+    unique_decisions = cards.drop_duplicates(group_columns) if group_columns else cards
+    winner = unique_decisions.get("winner", pd.Series([""] * len(unique_decisions))).map(_normal)
+    decision_wins = winner == fighter_name
+    five_round_cols = [column for column in ["round_4_a", "round_4_b", "round_5_a", "round_5_b"] if column in cards.columns]
+    five_round_decisions = 0.0
+    if five_round_cols:
+        five_round_decisions = float(cards[five_round_cols].notna().any(axis=1).sum())
+    elif "scheduled_rounds" in cards.columns:
+        five_round_decisions = float((pd.to_numeric(cards["scheduled_rounds"], errors="coerce") >= 5).sum())
+    championship_decisions = 0.0
+    for column in ["title_fight", "main_event"]:
+        if column in unique_decisions.columns:
+            championship_decisions += float(pd.to_numeric(unique_decisions[column], errors="coerce").fillna(0.0).gt(0).sum())
+    judge_counts = cards.groupby(group_columns).size() if group_columns else pd.Series(dtype=float)
+    decision_count = max(len(unique_decisions), 1)
     return {
         "close_decision_rate": float((margins.abs() <= 1).mean()) if not margins.empty else 0.0,
         "average_rounds_won_decisions": float((margins > 0).mean() * 3.0) if not margins.empty else 0.0,
         "judge_disagreement_score": float(judge_counts.std()) if len(judge_counts) > 1 else 0.0,
         "split_decision_rate": float(decision_type.str.contains("split").mean()),
+        "prior_decision_win_rate": float(decision_wins.mean()) if len(unique_decisions) else 0.0,
+        "prior_split_decision_rate": float(decision_type.str.contains("split").mean()),
+        "prior_average_scorecard_margin": float(margins.mean()) if not margins.empty else 0.0,
+        "prior_close_decision_rate": float((margins.abs() <= 1).mean()) if not margins.empty else 0.0,
+        "prior_fights_gone_to_decision_rate": float(len(unique_decisions) / decision_count),
+        "prior_five_round_decision_experience": five_round_decisions,
+        "prior_championship_main_event_decision_experience": championship_decisions,
     }
+
+
+def _parse_raw_score_pairs(value: Any) -> list[tuple[int, int]]:
+    import re
+
+    if value is None or pd.isna(value):
+        return []
+    pairs: list[tuple[int, int]] = []
+    for first, second in re.findall(r"\b(\d{2})\s*-\s*(\d{2})\b", str(value)):
+        try:
+            pairs.append((int(first), int(second)))
+        except ValueError:
+            continue
+    return pairs
 
 
 def _enriched_history_for_trends(
@@ -549,6 +601,11 @@ def compute_fighter_snapshot(
     last_date = pd.to_datetime(history["fight_date"], errors="coerce").max()
     as_timestamp = pd.Timestamp(as_of_date)
     days_since_last = (as_timestamp - last_date).days if pd.notna(last_date) else 999
+    scheduled_rounds_history = (
+        pd.to_numeric(history["scheduled_rounds"], errors="coerce")
+        if "scheduled_rounds" in history.columns
+        else pd.Series([0.0] * len(history), index=history.index)
+    )
     snapshot.update(
         {
             "ufc_debut": 0.0,
@@ -568,7 +625,7 @@ def compute_fighter_snapshot(
             "short_turnaround_under_60": float(days_since_last < 60),
             "age_decline_risk": float(snapshot.get("age", 0.0) >= 35 and days_since_last > 180),
             "average_fight_duration": float(history.apply(infer_fight_duration_seconds, axis=1).mean()),
-            "five_round_experience": float((pd.to_numeric(history.get("scheduled_rounds", 0), errors="coerce") >= 5).sum()),
+            "five_round_experience": float((scheduled_rounds_history >= 5).sum()),
             "main_event_experience": _mean(history.get("main_event", pd.Series(dtype=float)), 0.0) * fight_count,
             "title_fight_experience": _mean(history.get("title_fight", pd.Series(dtype=float)), 0.0) * fight_count,
             "max_history_date_used": last_date,

@@ -19,8 +19,9 @@ from ufc_predictor.models.explain import (
 )
 
 
-WARNING_TEXT = "Prediction is not guaranteed. Confidence is based on calibrated historical performance."
+WARNING_TEXT = "Prediction is uncertain. Confidence is based on calibrated historical performance."
 NEUTRAL_FALLBACK_REASON = "No historical data available; using neutral fallback."
+VALUE_CAUTION_TEXT = "This is not a guarantee. Historical model-vs-market performance should be checked before relying on this."
 
 
 def confidence_tier(
@@ -46,6 +47,20 @@ def normalize_probability_pair(probability_a: float) -> tuple[float, float]:
     return a / total, b / total
 
 
+def value_label_for_edge(edge: float | None) -> str:
+    if edge is None or pd.isna(edge) or edge < settings.value_small_edge_threshold:
+        return "No clear edge"
+    if edge < settings.value_medium_edge_threshold:
+        return "Small potential edge based on model disagreement with the market"
+    if edge < settings.value_large_edge_threshold:
+        return "Medium potential edge based on model disagreement with the market"
+    return "Large potential edge based on model disagreement with the market"
+
+
+def _blend_probability(model_probability: float, market_probability: float, weight: float) -> float:
+    return float(np.clip(weight * model_probability + (1.0 - weight) * market_probability, 0.0, 1.0))
+
+
 def format_prediction_output(
     fighter_a: str,
     fighter_b: str,
@@ -56,17 +71,28 @@ def format_prediction_output(
     top_factors_for_fighter_b: list[str] | None = None,
     biggest_uncertainty_factors: list[str] | None = None,
     missing_data_warnings: list[str] | None = None,
+    pure_model_probability: float | None = None,
+    market_implied_probability: float | None = None,
+    blended_probability: float | None = None,
+    final_probability_used: float | None = None,
+    model_mode: str = "pure_model",
+    edge_vs_market: float | None = None,
+    value_label: str | None = None,
+    show_value_analysis: bool = False,
 ) -> dict[str, Any]:
     prob_a, prob_b = normalize_probability_pair(fighter_a_win_probability)
     predicted_winner = fighter_a if prob_a >= prob_b else fighter_b
     confidence_score = max(prob_a, prob_b)
-    return {
+    output = {
         "fighter_a": fighter_a,
         "fighter_b": fighter_b,
         "predicted_winner": predicted_winner,
         "fighter_a_win_probability": round(prob_a, 4),
         "fighter_b_win_probability": round(prob_b, 4),
         "calibrated_probability": round(prob_a, 4),
+        "pure_model_probability": round(float(pure_model_probability if pure_model_probability is not None else prob_a), 4),
+        "final_probability_used": round(float(final_probability_used if final_probability_used is not None else prob_a), 4),
+        "model_mode": model_mode,
         "confidence_score": round(confidence_score, 4),
         "confidence_tier": confidence_tier(confidence_score),
         "uncertainty_range": uncertainty_range or [round(prob_a, 4), round(prob_a, 4)],
@@ -77,6 +103,16 @@ def format_prediction_output(
         "missing_data_warnings": missing_data_warnings or [],
         "warning": WARNING_TEXT,
     }
+    if market_implied_probability is not None:
+        output["market_implied_probability"] = round(float(market_implied_probability), 4)
+    if blended_probability is not None:
+        output["blended_probability"] = round(float(blended_probability), 4)
+    if edge_vs_market is not None:
+        output["edge_vs_market"] = round(float(edge_vs_market), 4)
+    if show_value_analysis:
+        output["value_label"] = value_label or value_label_for_edge(edge_vs_market)
+        output["value_analysis_note"] = VALUE_CAUTION_TEXT
+    return output
 
 
 def neutral_prediction_output(
@@ -241,6 +277,9 @@ def predict_fight(
     fight_stats: pd.DataFrame | None = None,
     fighters: pd.DataFrame | None = None,
     scorecards: pd.DataFrame | None = None,
+    odds: pd.DataFrame | None = None,
+    model_mode: str = "pure",
+    show_value_analysis: bool = False,
     extra_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     row = build_prediction_features(
@@ -258,6 +297,9 @@ def predict_fight(
     if _needs_neutral_fallback(model, row.iloc[0], fights, fight_stats, fighters, scorecards):
         return neutral_prediction_output(fighter_a, fighter_b)
 
+    mode = model_mode.strip().lower().replace("_", "-")
+    if mode not in {"pure", "market-aware"}:
+        mode = "pure"
     bundle = model
     if isinstance(model, (str, Path)):
         try:
@@ -276,19 +318,63 @@ def predict_fight(
     else:
         prob_a = float(row.get("fighter_a_elo_expected_win_probability", pd.Series([0.5])).iloc[0])
         uncertainty = [prob_a, prob_a]
-    predicted = fighter_a if prob_a >= 0.5 else fighter_b
+
+    market_probability = None
+    if mode == "market-aware":
+        from ufc_predictor.odds import market_probability_for_fight
+
+        context = extra_context or {}
+        market_probability = market_probability_for_fight(
+            odds,
+            fighter_a=fighter_a,
+            fighter_b=fighter_b,
+            fight_date=fight_date,
+            event=str(context.get("event_name", context.get("event", ""))),
+        )
+    final_prob_a = prob_a
+    blended_probability = None
+    market_prob_a = None
+    edge_vs_market = None
+    if mode == "market-aware" and market_probability is not None:
+        market_prob_a = float(market_probability["market_implied_probability"])
+        edge_vs_market = prob_a - market_prob_a
+        weight = 1.0
+        if bundle is not None and hasattr(bundle, "metrics"):
+            weight = float(getattr(bundle, "metrics", {}).get("market_blend", {}).get("weight", 1.0))
+        blended_probability = _blend_probability(prob_a, market_prob_a, weight)
+        final_prob_a = blended_probability
+        if uncertainty:
+            uncertainty = [
+                round(_blend_probability(float(uncertainty[0]), market_prob_a, weight), 4),
+                round(_blend_probability(float(uncertainty[1]), market_prob_a, weight), 4),
+            ]
+    predicted = fighter_a if final_prob_a >= 0.5 else fighter_b
     reasons = top_reasons_from_features(row.iloc[0], fighter_a, fighter_b, predicted_winner=predicted, max_reasons=10)
     a_factors, b_factors = top_factors_by_side(row.iloc[0], fighter_a, fighter_b, max_reasons=5)
+    missing_warnings = missing_data_warnings_from_features(row.iloc[0])
+    if mode == "market-aware" and market_probability is None:
+        missing_warnings = [
+            *missing_warnings,
+            "No matching market odds were found; using pure model probability.",
+        ]
     return format_prediction_output(
         fighter_a,
         fighter_b,
-        prob_a,
+        final_prob_a,
         reasons,
         uncertainty_range=uncertainty,
         top_factors_for_fighter_a=a_factors,
         top_factors_for_fighter_b=b_factors,
         biggest_uncertainty_factors=uncertainty_factors_from_features(row.iloc[0]),
-        missing_data_warnings=missing_data_warnings_from_features(row.iloc[0]),
+        missing_data_warnings=missing_warnings,
+        pure_model_probability=prob_a,
+        market_implied_probability=market_prob_a,
+        blended_probability=blended_probability,
+        final_probability_used=final_prob_a,
+        model_mode="market_aware" if mode == "market-aware" and market_probability is not None else "pure_model",
+        edge_vs_market=edge_vs_market,
+        value_label=value_label_for_edge(edge_vs_market),
+        show_value_analysis=show_value_analysis,
     )
 
 

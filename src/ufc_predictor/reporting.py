@@ -9,7 +9,7 @@ import pandas as pd
 from ufc_predictor.config import settings
 from ufc_predictor.data_io import read_optional_csv
 from ufc_predictor.data_sources import summarize_raw_data
-from ufc_predictor.odds import attach_odds_features
+from ufc_predictor.odds import odds_coverage_report
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -82,11 +82,8 @@ def _known_binary_mask(series: pd.Series) -> pd.Series:
 def _odds_coverage(fights: pd.DataFrame, odds: pd.DataFrame | None) -> tuple[int, float]:
     if fights.empty or odds is None or odds.empty:
         return 0, 0.0
-    attached = attach_odds_features(fights[["fight_date", "fighter_a", "fighter_b"]].copy(), odds)
-    if "market_fighter_a_implied_probability" not in attached.columns:
-        return 0, 0.0
-    count = int(pd.to_numeric(attached["market_fighter_a_implied_probability"], errors="coerce").notna().sum())
-    return count, _percent(count, len(fights))
+    report = odds_coverage_report(fights, odds)
+    return report.final_odds_coverage_count, report.final_odds_coverage_percent
 
 
 def _scorecard_coverage(fights: pd.DataFrame, scorecards: pd.DataFrame | None) -> tuple[int, float]:
@@ -196,6 +193,7 @@ def build_performance_report(
     metadata = _read_json(models / "model_metadata.json")
     model_card = _read_json(models / "model_card.json")
     backtest = _read_json(processed / "backtest_results.json")
+    model_mode_comparison = _read_json(processed / "model_mode_comparison.json")
     summary = summarize_raw_data(raw_dir=raw)
     coverage = build_data_quality_coverage(raw)
     train_metrics = metadata.get("metrics", {})
@@ -236,14 +234,26 @@ def build_performance_report(
             "log_loss": backtest.get("log_loss"),
             "brier_score": backtest.get("brier_score"),
             "expected_calibration_error": backtest.get("expected_calibration_error"),
+            "model_mode": backtest.get("model_mode", "pure"),
             "confidence_tier_performance": backtest.get("performance_by_confidence_tier", {}),
             "yearly_performance": backtest.get("performance_by_year", {}),
+            "modern_era_performance": backtest.get("performance_by_modern_era", {}),
             "performance_by_weight_class": backtest.get("performance_by_weight_class", {}),
             "performance_by_main_event": backtest.get("performance_by_main_event", {}),
             "model_vs_market": backtest.get("model_vs_market", {}),
             "summary": backtest.get("backtest_summary", {}),
         },
+        "model_mode_comparison": model_mode_comparison,
         "data_quality_coverage": coverage,
+        "market_analysis": {
+            "odds_usage": "Pure model training excludes odds columns; odds are used for market comparison, optional market-aware blending, and potential-value analysis only.",
+            "value_analysis_thresholds": {
+                "small_potential_edge": settings.value_small_edge_threshold,
+                "medium_potential_edge": settings.value_medium_edge_threshold,
+                "large_potential_edge": settings.value_large_edge_threshold,
+            },
+            "caution": "Potential value labels are analytical only and do not promise profit.",
+        },
         "calibration": {
             "train_curve": train_metrics.get("calibration_curve", []),
             "backtest_curve": backtest.get("calibration_curve", []),

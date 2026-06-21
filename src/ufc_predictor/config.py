@@ -58,6 +58,9 @@ class Settings:
     retry_count: int
     confidence_low_threshold: float
     confidence_high_threshold: float
+    value_small_edge_threshold: float
+    value_medium_edge_threshold: float
+    value_large_edge_threshold: float
     sportsdataio_api_key: str | None
 
     @classmethod
@@ -83,6 +86,9 @@ class Settings:
             retry_count=_int_env("UFC_PREDICTOR_RETRY_COUNT", 3),
             confidence_low_threshold=_float_env("UFC_PREDICTOR_CONFIDENCE_LOW_THRESHOLD", 0.57),
             confidence_high_threshold=_float_env("UFC_PREDICTOR_CONFIDENCE_HIGH_THRESHOLD", 0.65),
+            value_small_edge_threshold=_float_env("UFC_PREDICTOR_VALUE_SMALL_EDGE_THRESHOLD", 0.03),
+            value_medium_edge_threshold=_float_env("UFC_PREDICTOR_VALUE_MEDIUM_EDGE_THRESHOLD", 0.05),
+            value_large_edge_threshold=_float_env("UFC_PREDICTOR_VALUE_LARGE_EDGE_THRESHOLD", 0.08),
             sportsdataio_api_key=os.getenv("SPORTS_DATA_IO_API_KEY") or None,
         )
 
