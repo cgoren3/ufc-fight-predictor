@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+import csv
 import re
 import unicodedata
 
@@ -37,6 +38,42 @@ STRING_ENRICHMENT_FIELDS = ["weight_class", "event_location"]
 NUMERIC_ENRICHMENT_FIELDS = ["main_event", "title_fight", "scheduled_rounds"]
 UNKNOWN_WEIGHT_VALUES = {"", "unknown", "unk", "n/a", "na", "none", "nan"}
 EVENT_ID_ALIASES = ["event_id", "event_id_x", "event_id_y"]
+FIGHT_DATE_ALIASES = ["fight_date", "event_date", "date", "card_date"]
+EVENT_ALIASES = ["event", "event_name", "event_title", "name", "card", "card_name"]
+FIGHTER_A_ALIASES = ["fighter_a", "red_fighter", "r_fighter", "fighter_1", "fight_fighter", "fighter"]
+FIGHTER_B_ALIASES = ["fighter_b", "blue_fighter", "b_fighter", "fighter_2", "opponent"]
+BOUT_ALIASES = ["bout", "matchup", "fight", "fighters"]
+WEIGHT_CLASS_ALIASES = ["weight_class", "division", "class", "bout_weight", "weightclass", "weight"]
+EVENT_LOCATION_ALIASES = [
+    "event_location",
+    "location",
+    "venue",
+    "place",
+    "event_venue_name",
+    "event_venue_city",
+    "event_venue_state",
+    "event_venue_country",
+    "venue_name",
+    "venue_city",
+    "venue_state",
+    "venue_country",
+    "city",
+    "state",
+    "country",
+]
+MAIN_EVENT_ALIASES = ["main_event", "is_main_event", "bout_order", "fight_order"]
+TITLE_FIGHT_ALIASES = ["title_fight", "is_title_fight", "championship", "title", "title_bout", "belt"]
+DIRECT_TITLE_FIGHT_ALIASES = ["title_fight", "is_title_fight", "championship", "title", "title_bout"]
+SCHEDULED_ROUNDS_ALIASES = ["scheduled_rounds", "no_of_rounds", "rounds", "time_format", "max_rounds"]
+ODDS_ALIASES = [
+    "fighter_a_odds",
+    "fighter_b_odds",
+    "red_fighter_moneyline_odds",
+    "blue_fighter_moneyline_odds",
+    "moneyline",
+    "odds",
+]
+SCORECARD_ALIASES = ["score_cards", "scorecards", "judge", "round_1_a", "round_1_b", "total_a", "total_b"]
 MISSING_ENRICHMENT_GUIDANCE = (
     "Run ufc-predict build-enrichment-template, fill in the missing columns, "
     "save it as data/raw/imports/fight_enrichment.csv, then rerun import-enrichment."
@@ -116,6 +153,7 @@ class ExternalEnrichmentSourceReport:
     matched_rows: int = 0
     unmatched_rows: int = 0
     columns: list[str] = field(default_factory=list)
+    dataset_type: str = "unknown"
     usable_fields: list[str] = field(default_factory=list)
     updated_fields: dict[str, int] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
@@ -127,8 +165,29 @@ class ExternalEnrichmentSourceReport:
             "matched_rows": self.matched_rows,
             "unmatched_rows": self.unmatched_rows,
             "columns": self.columns,
+            "dataset_type": self.dataset_type,
             "usable_fields": self.usable_fields,
             "updated_fields": self.updated_fields,
+            "warnings": self.warnings,
+        }
+
+
+@dataclass
+class EnrichmentSourceInspection:
+    path: Path
+    rows_read: int = 0
+    columns: list[str] = field(default_factory=list)
+    dataset_type: str = "unknown"
+    usable_fields: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "path": str(self.path),
+            "rows_read": self.rows_read,
+            "columns": self.columns,
+            "dataset_type": self.dataset_type,
+            "usable_fields": self.usable_fields,
             "warnings": self.warnings,
         }
 
@@ -593,7 +652,7 @@ def _compose_location_from_row(row: pd.Series | dict[str, Any]) -> str:
     venue_location = ", ".join(_clean(part) for part in venue_parts if _non_empty(part))
     if venue_location:
         return venue_location
-    return _first_present(row, ["event_location", "location", "venue", "place"])
+    return _first_present(row, EVENT_LOCATION_ALIASES)
 
 
 def _event_id_value(row: pd.Series | dict[str, Any]) -> str:
@@ -602,8 +661,8 @@ def _event_id_value(row: pd.Series | dict[str, Any]) -> str:
 
 def _event_metadata_payload(row: pd.Series | dict[str, Any]) -> dict[str, Any]:
     return {
-        "event": _first_present(row, ["event", "event_name", "name", "card", "card_name"]),
-        "fight_date": _first_present(row, ["fight_date", "event_date", "date", "card_date"]),
+        "event": _first_present(row, EVENT_ALIASES),
+        "fight_date": _first_present(row, FIGHT_DATE_ALIASES),
         "event_location": _compose_location_from_row(row),
     }
 
@@ -663,48 +722,178 @@ def _has_any_value(frame: pd.DataFrame, columns: list[str]) -> bool:
     return False
 
 
-def _usable_fields_for_source(frame: pd.DataFrame) -> list[str]:
+def _has_fighter_pair_columns(frame: pd.DataFrame) -> bool:
+    return (
+        (_has_any_value(frame, FIGHTER_A_ALIASES) and _has_any_value(frame, FIGHTER_B_ALIASES))
+        or _has_any_value(frame, BOUT_ALIASES)
+    )
+
+
+def _column_present(columns: set[str], aliases: list[str]) -> bool:
+    return any(alias in columns for alias in aliases)
+
+
+def _source_fields_from_columns(columns: list[str]) -> list[str]:
+    column_set = set(columns)
     fields: list[str] = []
-    if _has_any_value(frame, ["fight_date", "event_date", "date", "card_date"]):
-        fields.append("fight_date")
-    if _has_any_value(frame, ["event", "event_name", "name", "card", "card_name"]):
-        fields.append("event")
-    if (
-        (_has_any_value(frame, ["fighter_a", "red_fighter", "r_fighter", "fighter_1", "fighter"]) and _has_any_value(frame, ["fighter_b", "blue_fighter", "b_fighter", "fighter_2", "opponent"]))
-        or _has_any_value(frame, ["bout", "matchup", "fight", "fighters"])
-    ):
-        fields.append("fighter_pair")
-    if _has_any_value(frame, ["weight_class", "division", "class", "bout_weight", "weight"]):
+    if _column_present(column_set, WEIGHT_CLASS_ALIASES):
         fields.append("weight_class")
-    if _has_any_value(frame, ["event_location", "location", "venue", "place", "event_venue_name", "event_venue_city", "event_venue_state", "event_venue_country"]):
+    if _column_present(column_set, EVENT_LOCATION_ALIASES):
         fields.append("event_location")
-    if _has_any_value(frame, ["main_event", "is_main_event"]):
+    if _column_present(column_set, MAIN_EVENT_ALIASES):
         fields.append("main_event")
-    if _has_any_value(frame, ["title_fight", "is_title_fight", "championship", "title"]):
+    has_context = _has_fighter_pair_columns_by_name(column_set) or (
+        _column_present(column_set, EVENT_ALIASES) and _column_present(column_set, FIGHT_DATE_ALIASES)
+    )
+    if _column_present(column_set, DIRECT_TITLE_FIGHT_ALIASES) or ("belt" in column_set and has_context):
         fields.append("title_fight")
-    if _has_any_value(frame, ["scheduled_rounds", "no_of_rounds", "rounds", "time_format"]):
+    if _column_present(column_set, SCHEDULED_ROUNDS_ALIASES):
         fields.append("scheduled_rounds")
+    if _column_present(column_set, ODDS_ALIASES) or any(column.endswith("_odds") for column in column_set):
+        fields.append("odds")
+    if _column_present(column_set, SCORECARD_ALIASES):
+        fields.append("scorecards")
     return fields
 
 
+def _has_fighter_pair_columns_by_name(columns: set[str]) -> bool:
+    return (_column_present(columns, FIGHTER_A_ALIASES) and _column_present(columns, FIGHTER_B_ALIASES)) or _column_present(columns, BOUT_ALIASES)
+
+
+def _guess_source_dataset_type_from_columns(columns: list[str]) -> str:
+    column_set = set(columns)
+    fields = _source_fields_from_columns(columns)
+    if "scorecards" in fields and not _has_fighter_pair_columns_by_name(column_set):
+        return "scorecards"
+    if "odds" in fields and not _has_fighter_pair_columns_by_name(column_set):
+        return "odds"
+    if _has_fighter_pair_columns_by_name(column_set) and any(field in fields for field in ENRICHABLE_FIELDS):
+        return "fight-level enrichment"
+    if _column_present(column_set, EVENT_ALIASES) and _column_present(column_set, FIGHT_DATE_ALIASES) and "event_location" in fields:
+        return "event-level enrichment"
+    if "scorecards" in fields:
+        return "scorecards"
+    if "odds" in fields:
+        return "odds"
+    return "unknown"
+
+
+def _read_source_header_and_count(path: Path) -> tuple[list[str], int]:
+    with path.open("r", encoding="utf-8-sig", newline="") as handle:
+        reader = csv.reader(handle)
+        columns = next(reader, [])
+        rows = sum(1 for _ in reader)
+    return [str(column) for column in columns], rows
+
+
+def _usable_fields_for_source(frame: pd.DataFrame) -> list[str]:
+    fields: list[str] = []
+    if _has_any_value(frame, FIGHT_DATE_ALIASES):
+        fields.append("fight_date")
+    if _has_any_value(frame, EVENT_ALIASES):
+        fields.append("event")
+    if _has_fighter_pair_columns(frame):
+        fields.append("fighter_pair")
+    if _has_any_value(frame, WEIGHT_CLASS_ALIASES):
+        fields.append("weight_class")
+    if _has_any_value(frame, EVENT_LOCATION_ALIASES):
+        fields.append("event_location")
+    if _has_any_value(frame, MAIN_EVENT_ALIASES):
+        fields.append("main_event")
+    has_context = _has_fighter_pair_columns(frame) or (_has_any_value(frame, EVENT_ALIASES) and _has_any_value(frame, FIGHT_DATE_ALIASES))
+    if _has_any_value(frame, DIRECT_TITLE_FIGHT_ALIASES) or ("belt" in frame.columns and has_context and _has_any_value(frame, ["belt"])):
+        fields.append("title_fight")
+    if _has_any_value(frame, SCHEDULED_ROUNDS_ALIASES):
+        fields.append("scheduled_rounds")
+    if _has_any_value(frame, ODDS_ALIASES) or any(column.endswith("_odds") for column in frame.columns):
+        fields.append("odds")
+    if _has_any_value(frame, SCORECARD_ALIASES):
+        fields.append("scorecards")
+    return fields
+
+
+def _enrichment_fields_for_source(frame: pd.DataFrame) -> list[str]:
+    return [field for field in _usable_fields_for_source(frame) if field in ENRICHABLE_FIELDS]
+
+
+def _guess_source_dataset_type(frame: pd.DataFrame) -> str:
+    fields = _usable_fields_for_source(frame)
+    if "scorecards" in fields and not _has_fighter_pair_columns(frame):
+        return "scorecards"
+    if "odds" in fields and not _has_fighter_pair_columns(frame):
+        return "odds"
+    if _has_fighter_pair_columns(frame) and any(field in fields for field in ENRICHABLE_FIELDS):
+        return "fight-level enrichment"
+    if _has_any_value(frame, EVENT_ALIASES) and _has_any_value(frame, FIGHT_DATE_ALIASES) and "event_location" in fields:
+        return "event-level enrichment"
+    if "scorecards" in fields:
+        return "scorecards"
+    if "odds" in fields:
+        return "odds"
+    return "unknown"
+
+
+def _source_inspection_for_path(path: Path, event_maps: dict[str, dict[str, Any]] | None = None) -> EnrichmentSourceInspection:
+    report = EnrichmentSourceInspection(path=path.resolve())
+    try:
+        report.columns, report.rows_read = _read_source_header_and_count(path)
+        canonical_columns = [
+            re.sub(r"_+", "_", re.sub(r"[^a-z0-9]+", "_", str(column).strip().lower())).strip("_")
+            for column in report.columns
+        ]
+    except Exception as exc:
+        report.warnings.append(f"Could not read enrichment source: {type(exc).__name__}: {exc}")
+        return report
+    report.usable_fields = _source_fields_from_columns(canonical_columns)
+    report.dataset_type = _guess_source_dataset_type_from_columns(canonical_columns)
+    if not report.usable_fields:
+        report.warnings.append("No usable enrichment, odds, or scorecard columns found.")
+    return report
+
+
+def inspect_enrichment_sources(source_dir: str | Path | None = None) -> tuple[Path, bool, list[EnrichmentSourceInspection]]:
+    directory = Path(source_dir) if source_dir else settings.raw_data_dir / "enrichment_sources"
+    directory = directory.resolve()
+    if not directory.exists():
+        return directory, False, []
+    source_paths = _source_csv_files(directory)
+    return directory, True, [_source_inspection_for_path(path) for path in source_paths]
+
+
+def _main_event_value_from_row(row: pd.Series | dict[str, Any]) -> Any:
+    direct = _first_present(row, ["main_event", "is_main_event"])
+    if _non_empty(direct):
+        return direct
+    order = _first_present(row, ["bout_order", "fight_order"])
+    if not _non_empty(order):
+        return ""
+    order_text = _key_text(order)
+    if "main" in order_text:
+        return 1
+    numeric = pd.to_numeric(pd.Series([order]), errors="coerce").iloc[0]
+    if not pd.isna(numeric) and int(numeric) == float(numeric) and int(numeric) == 1:
+        return 1
+    return ""
+
+
 def _external_row_to_payload(row: pd.Series) -> dict[str, Any]:
-    fighter_a = _first_present(row, ["fighter_a", "red_fighter", "r_fighter", "fighter_1", "fight_fighter", "fighter"])
-    fighter_b = _first_present(row, ["fighter_b", "blue_fighter", "b_fighter", "fighter_2", "opponent"])
-    bout = _first_present(row, ["bout", "matchup", "fight", "fighters"])
+    fighter_a = _first_present(row, FIGHTER_A_ALIASES)
+    fighter_b = _first_present(row, FIGHTER_B_ALIASES)
+    bout = _first_present(row, BOUT_ALIASES)
     if (not _non_empty(fighter_a) or not _non_empty(fighter_b)) and _non_empty(bout):
         parsed = _split_bout(bout)
         if parsed is not None:
             fighter_a, fighter_b = parsed
     return {
-        "fight_date": _first_present(row, ["fight_date", "event_date", "date", "card_date"]),
-        "event": _first_present(row, ["event", "event_name", "name", "card", "card_name"]),
+        "fight_date": _first_present(row, FIGHT_DATE_ALIASES),
+        "event": _first_present(row, EVENT_ALIASES),
         "fighter_a": fighter_a,
         "fighter_b": fighter_b,
-        "weight_class": _first_present(row, ["weight_class", "division", "class", "bout_weight", "weight"]),
+        "weight_class": _first_present(row, WEIGHT_CLASS_ALIASES),
         "event_location": _compose_location_from_row(row),
-        "main_event": _first_present(row, ["main_event", "is_main_event"]),
-        "title_fight": _first_present(row, ["title_fight", "is_title_fight", "championship", "title"]),
-        "scheduled_rounds": _first_present(row, ["scheduled_rounds", "no_of_rounds", "rounds", "time_format"]),
+        "main_event": _main_event_value_from_row(row),
+        "title_fight": _first_present(row, TITLE_FIGHT_ALIASES),
+        "scheduled_rounds": _first_present(row, SCHEDULED_ROUNDS_ALIASES),
     }
 
 
@@ -791,7 +980,7 @@ def merge_external_enrichment_sources(
     source_paths = _source_csv_files(directory)
     event_maps = _build_event_metadata_maps(source_paths)
     for path in source_paths:
-        report = ExternalEnrichmentSourceReport(path=path, updated_fields={field: 0 for field in ENRICHABLE_FIELDS})
+        report = ExternalEnrichmentSourceReport(path=path.resolve(), updated_fields={field: 0 for field in ENRICHABLE_FIELDS})
         try:
             raw_input = pd.read_csv(path)
             report.columns = [str(column) for column in raw_input.columns]
@@ -802,6 +991,7 @@ def merge_external_enrichment_sources(
             continue
         report.rows_read = int(len(raw))
         report.usable_fields = _usable_fields_for_source(raw)
+        report.dataset_type = _guess_source_dataset_type(raw)
         if not report.usable_fields:
             report.warnings.append("No usable enrichment columns found.")
         for _, row in raw.iterrows():
@@ -1080,7 +1270,8 @@ def merge_enrichment_into_fights(
     if matched == 0:
         warnings.append("No enrichment rows matched fights.csv. Check fight_date, event, and fighter names.")
     provided_weight = enrichment_copy["weight_class"].map(lambda value: _non_empty(value) and not is_unknown_weight_class(value))
-    if bool(provided_weight.any()) and updated_fields["weight_class"] == 0:
+    populated_weight_after = merged["weight_class"].map(lambda value: _non_empty(value) and not is_unknown_weight_class(value))
+    if bool(provided_weight.any()) and updated_fields["weight_class"] == 0 and not bool(populated_weight_after.any()):
         warnings.append("Enrichment provided weight_class values, but no fights.csv weight_class values were updated.")
 
     merged = merged.drop(columns=["_enrichment_key"])

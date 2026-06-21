@@ -285,7 +285,31 @@ def enrichment_summary(
     _print(
         f"Known scheduled_rounds: {summary.known_scheduled_rounds_count}/{summary.total_fights} "
         f"({summary.known_scheduled_rounds_pct:.1f}%)"
-    )
+        )
+
+
+@app.command("enrichment-sources")
+def enrichment_sources(
+    source_dir: Path = typer.Option(
+        settings.raw_data_dir / "enrichment_sources",
+        help="Directory containing external enrichment CSV sources.",
+    ),
+) -> None:
+    from ufc_predictor.enrichment import inspect_enrichment_sources
+
+    directory, exists, reports = inspect_enrichment_sources(source_dir)
+    _print(f"Searched enrichment directory: {directory}")
+    _print(f"Directory exists: {exists}")
+    _print(f"Source files found: {len(reports)}")
+    for report in reports:
+        _print(f"- {report.path.name}:")
+        _print(f"  file path: {report.path}")
+        _print(f"  row count: {report.rows_read}")
+        _print(f"  column names: {', '.join(report.columns) if report.columns else '(none)'}")
+        _print(f"  guessed dataset type: {report.dataset_type}")
+        _print(f"  usable fields: {', '.join(report.usable_fields) if report.usable_fields else '(none)'}")
+        for warning in report.warnings:
+            _print(f"  [yellow]Warning: {warning}[/yellow]")
 
 
 @app.command("auto-enrich")
@@ -310,6 +334,11 @@ def auto_enrich(
         frame, report = run_auto_enrich(template_path=template_path, output_path=output_path, source_dir=source_dir)
     except InputDataError as exc:
         _runtime_error(f"Auto-enrichment failed:\n{exc}")
+    if verbose:
+        searched_dir = source_dir.resolve()
+        _print(f"Searched enrichment directory: {searched_dir}")
+        _print(f"Directory exists: {searched_dir.exists()}")
+        _print(f"Source files found: {len(report.external_sources)}")
     _print(f"Wrote auto-enriched fight_enrichment.csv with {len(frame)} rows to {report.output_path}")
     _print(f"Inferred main_event=1 rows: {report.inferred_main_event_rows}")
     _print(f"Inferred main_event=0 rows: {report.inferred_non_main_event_rows}")
@@ -323,8 +352,11 @@ def auto_enrich(
             _print(f"- {source.path.name}: rows={source.rows_read}, matched={source.matched_rows}, unmatched={source.unmatched_rows}")
             if verbose:
                 _print(f"  path: {source.path}")
+                _print(f"  dataset type: {source.dataset_type}")
                 _print(f"  columns: {', '.join(source.columns) if source.columns else '(none)'}")
                 _print(f"  usable fields: {', '.join(source.usable_fields) if source.usable_fields else '(none)'}")
+                filled = ", ".join(f"{field}={count}" for field, count in source.updated_fields.items() if count)
+                _print(f"  fields filled: {filled if filled else '(none)'}")
             for field, count in source.updated_fields.items():
                 if count:
                     _print(f"  {field}: {count}")
@@ -333,6 +365,10 @@ def auto_enrich(
     else:
         _print(f"No external enrichment CSVs found under {source_dir}.")
     if verbose:
+        total_matched = sum(source.matched_rows for source in report.external_sources)
+        total_unmatched = sum(source.unmatched_rows for source in report.external_sources)
+        _print(f"Total matched rows: {total_matched}")
+        _print(f"Total unmatched rows: {total_unmatched}")
         summary = enrichment_summary_from_frame(frame, report.output_path)
         _print("Final enrichment coverage:")
         _print(f"- known weight_class: {summary.known_weight_class_count}/{summary.total_fights} ({summary.known_weight_class_pct:.1f}%)")
@@ -382,14 +418,19 @@ def import_enrichment(
             )
         _runtime_error(f"Fight enrichment import failed:\n{exc}{guidance}{note}")
 
-    _print(f"Applied fight enrichment from {enrichment_path}")
+    _print(f"Enrichment file read: {report.enrichment_path}")
+    _print(f"Fights file read: {report.fights_path}")
+    _print(f"Fights file written: {report.output_path}")
+    if Path(report.output_path).resolve() == Path(report.fights_path).resolve():
+        _print("Write mode: overwrote fights file in place after validation.")
+    else:
+        _print("Write mode: wrote enriched copy without modifying the input fights file.")
     _print(f"Enrichment format: {report.source_format}-level")
     _print(f"Fights rows: {report.fights_rows}")
     _print(f"Enrichment rows: {report.enrichment_rows}")
     _print(f"Matched enrichment rows: {report.matched_rows}")
     _print(f"Unmatched enrichment rows: {report.unmatched_enrichment_rows}")
-    _print(f"Wrote enriched fights CSV to {report.output_path}")
-    _print("Updated fields:")
+    _print("Fields updated:")
     for field, count in report.updated_fields.items():
         _print(f"- {field}: {count}")
     for warning in report.warnings:

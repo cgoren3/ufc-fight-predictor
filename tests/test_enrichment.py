@@ -100,6 +100,10 @@ def test_import_enrichment_command(tmp_path) -> None:
     )
 
     assert result.exit_code == 0
+    assert "Enrichment file read:" in result.output
+    assert "Fights file read:" in result.output
+    assert "Fights file written:" in result.output
+    assert "Fields updated:" in result.output
     assert "Enrichment format: fight-level" in result.output
     assert "Matched enrichment rows: 1" in result.output
     assert "weight_class: 1" in result.output
@@ -412,6 +416,46 @@ def test_auto_enrich_discovers_nested_sources_and_joins_event_id_metadata(tmp_pa
     assert "weight_class" in fight_source.usable_fields
 
 
+def test_enrichment_sources_command_recursively_detects_source_types(tmp_path) -> None:
+    source_dir = tmp_path / "enrichment_sources"
+    nested = source_dir / "ufc_2025_dataset" / "data"
+    nested.mkdir(parents=True)
+    pd.DataFrame(
+        [
+            {
+                "Event_Id": "E1",
+                "Name": "UFC Test: Alpha vs. Beta",
+                "Date": "2020-01-01",
+                "Location": "Las Vegas, Nevada, USA",
+            }
+        ]
+    ).to_csv(nested / "Events.csv", index=False)
+    pd.DataFrame(
+        [
+            {
+                "Event_Id": "E1",
+                "Fighter_1": "Alice Alpha",
+                "Fighter_2": "Beth Beta",
+                "WeightClass": "Lightweight",
+                "Max Rounds": 5,
+                "Title Bout": 1,
+            }
+        ]
+    ).to_csv(nested / "Fights.csv", index=False)
+
+    result = runner.invoke(app, ["enrichment-sources", "--source-dir", str(source_dir)])
+
+    assert result.exit_code == 0
+    assert "Searched enrichment directory:" in result.output
+    assert "Directory exists: True" in result.output
+    assert "Source files found: 2" in result.output
+    assert "Events.csv:" in result.output
+    assert "guessed dataset type: event-level enrichment" in result.output
+    assert "Fights.csv:" in result.output
+    assert "guessed dataset type: fight-level enrichment" in result.output
+    assert "usable fields: weight_class, title_fight, scheduled_rounds" in result.output
+
+
 def test_auto_enrich_does_not_overwrite_known_values_with_blanks(tmp_path) -> None:
     template = tmp_path / "fight_enrichment_template.csv"
     output = tmp_path / "fight_enrichment.csv"
@@ -578,9 +622,16 @@ def test_auto_enrich_verbose_prints_source_summary(tmp_path) -> None:
     )
 
     assert result.exit_code == 0
+    assert "Searched enrichment directory:" in result.output
+    assert "Directory exists: True" in result.output
+    assert "Source files found: 1" in result.output
     assert "Sources loaded: 1" in result.output
+    assert "dataset type: fight-level enrichment" in result.output
     assert "columns: event, date, location, division, bout, is_main_event, is_title_fight" in result.output
     assert "usable fields:" in result.output
+    assert "fields filled:" in result.output
+    assert "Total matched rows: 1" in result.output
+    assert "Total unmatched rows: 0" in result.output
     assert "Final enrichment coverage:" in result.output
 
 
@@ -748,9 +799,11 @@ def test_report_data_quality_coverage_counts_enriched_fields_odds_and_scorecards
 
     coverage = build_data_quality_coverage(raw_dir)
 
+    assert coverage["coverage_source"].endswith("fights.csv")
     assert coverage["known_weight_class_pct"] == 50.0
     assert coverage["known_event_location_pct"] == 50.0
     assert coverage["known_main_event_pct"] == 100.0
+    assert "known_title_fight_count" in coverage
     assert coverage["odds_coverage_pct"] == 50.0
     assert coverage["scorecard_coverage_pct"] == 50.0
 
