@@ -11,6 +11,7 @@ from ufc_predictor.cli import app
 from ufc_predictor.features.build_fight_dataset import build_fight_dataset
 from ufc_predictor.models.evaluate import rolling_backtest, tune_market_blend_weight
 from ufc_predictor.models.predict import format_prediction_output, value_label_for_edge
+from ufc_predictor.models.train import apply_recency_weighting
 from ufc_predictor.odds import american_odds_to_implied_probability, attach_odds_features
 
 
@@ -236,3 +237,19 @@ def test_value_analysis_labels_and_no_reckless_language() -> None:
     assert "this is not a guarantee" in text
     for forbidden in ["lock", "guaranteed", "must bet", "stake size", "stake-sizing"]:
         assert forbidden not in text
+
+
+def test_apply_recency_weighting_duplicates_recent_training_rows() -> None:
+    frame = pd.DataFrame(
+        [
+            {"fight_date": "2010-01-01", "fighter_a_win": 1},
+            {"fight_date": "2020-01-01", "fighter_a_win": 0},
+            {"fight_date": "2024-01-01", "fighter_a_win": 1},
+        ]
+    )
+
+    weighted, summary = apply_recency_weighting(frame)
+
+    assert summary["enabled"]
+    assert len(weighted) > len(frame)
+    assert summary["max_weight"] == 3

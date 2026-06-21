@@ -224,12 +224,34 @@ def chronological_split(
     return frame.iloc[:split_at].copy(), frame.iloc[split_at:].copy()
 
 
+def apply_recency_weighting(train_frame: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, Any]]:
+    if train_frame.empty or "fight_date" not in train_frame.columns:
+        return train_frame, {"enabled": False, "original_rows": int(len(train_frame)), "weighted_rows": int(len(train_frame))}
+    frame = train_frame.copy()
+    dates = pd.to_datetime(frame["fight_date"], errors="coerce")
+    latest = dates.max()
+    if pd.isna(latest):
+        return train_frame, {"enabled": False, "original_rows": int(len(train_frame)), "weighted_rows": int(len(train_frame))}
+    weights = pd.Series(1, index=frame.index, dtype=int)
+    weights.loc[dates >= latest - pd.DateOffset(years=5)] = 2
+    weights.loc[dates >= latest - pd.DateOffset(years=3)] = 3
+    weighted = frame.loc[frame.index.repeat(weights)].reset_index(drop=True)
+    return weighted, {
+        "enabled": True,
+        "original_rows": int(len(frame)),
+        "weighted_rows": int(len(weighted)),
+        "max_weight": int(weights.max()),
+        "latest_training_date": latest.date().isoformat(),
+    }
+
+
 def train_ensemble(
     dataset: pd.DataFrame,
     model_dir: str | Path | None = None,
     calibration_method: str = "sigmoid",
     test_fraction: float = 0.20,
     random_state: int = 42,
+    recency_weighting: bool = False,
     save: bool = True,
 ) -> TrainedModelBundle:
     if dataset.empty:
@@ -243,8 +265,12 @@ def train_ensemble(
     categorical = selection.categorical_features
     if not columns:
         raise ValueError("No usable model features remain after dropping all-null columns.")
-    x_train = train_frame[columns]
-    y_train = train_frame["fighter_a_win"].astype(int)
+    fit_frame, recency_summary = apply_recency_weighting(train_frame) if recency_weighting else (
+        train_frame,
+        {"enabled": False, "original_rows": int(len(train_frame)), "weighted_rows": int(len(train_frame))},
+    )
+    x_train = fit_frame[columns]
+    y_train = fit_frame["fighter_a_win"].astype(int)
     estimators = []
     for name, estimator, scale_numeric in _candidate_estimators(random_state=random_state):
         pipeline = _pipeline(estimator, numeric, categorical, scale_numeric=scale_numeric)
@@ -263,6 +289,7 @@ def train_ensemble(
     )
     metrics: dict[str, Any] = {"baselines": baseline_metrics(dataset)}
     metrics["feature_summary"] = selection.as_dict()
+    metrics["recency_weighting"] = recency_summary
     if "market_fighter_a_implied_probability" in train_frame.columns:
         train_probabilities = bundle.predict_proba(train_frame[columns])[:, 1]
         metrics["market_blend_training_window"] = tune_market_blend_weight(
@@ -313,6 +340,7 @@ def build_model_card(bundle: TrainedModelBundle, dataset: pd.DataFrame) -> dict[
         "feature_count": int(len(bundle.feature_columns)),
         "dropped_features": bundle.dropped_all_null_features,
         "model_type": [getattr(estimator, "model_name", type(estimator).__name__) for estimator in bundle.estimators],
+        "recency_weighting": bundle.metrics.get("recency_weighting", {}),
         "accuracy": bundle.metrics.get("accuracy"),
         "log_loss": bundle.metrics.get("log_loss"),
         "brier_score": bundle.metrics.get("brier_score"),

@@ -906,11 +906,12 @@ def report(
 def train(
     dataset_path: Path = typer.Option(_default_dataset_path(), help="Processed fight dataset."),
     model_dir: Path = typer.Option(settings.model_dir, help="Model output directory."),
+    recency_weighting: bool = typer.Option(False, "--recency-weighting", help="Duplicate recent training rows to emphasize the last 3-5 years."),
 ) -> None:
     from ufc_predictor.models.train import save_model_bundle, train_ensemble
 
     dataset = _read_dataset(dataset_path)
-    bundle = train_ensemble(dataset, model_dir=model_dir, save=False)
+    bundle = train_ensemble(dataset, model_dir=model_dir, save=False, recency_weighting=recency_weighting)
     model_path = save_model_bundle(bundle, model_dir=model_dir)
     _print_feature_summary(bundle.feature_summary)
     _print(f"Saved model to {model_path}")
