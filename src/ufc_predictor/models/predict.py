@@ -9,6 +9,7 @@ import pandas as pd
 
 from ufc_predictor.config import settings
 from ufc_predictor.features.elo import EloSystem
+from ufc_predictor.features.build_fight_dataset import _physical_attribute_features
 from ufc_predictor.features.fighter_history import compute_fighter_snapshot
 from ufc_predictor.features.style_features import compute_style_matchup_features
 from ufc_predictor.models.explain import (
@@ -237,6 +238,7 @@ def build_prediction_features(
     row.update(_prefix("fighter_a", a_snapshot))
     row.update(_prefix("fighter_b", b_snapshot))
     row.update(_diff(a_snapshot, b_snapshot))
+    row.update(_physical_attribute_features(a_snapshot, b_snapshot))
     row.update(compute_style_matchup_features(a_snapshot, b_snapshot))
     row.update(pre_fight_elo_snapshot(fights_frame, fighter_a, fighter_b, fight_date_ts, weight_class))
     return pd.DataFrame([row])

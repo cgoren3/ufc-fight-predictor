@@ -20,8 +20,11 @@ data/processed/
 
 # Generated raw-data metadata
 data/raw/source_metadata.json
+data/raw/staging/
+data/raw/backups/
 data/raw/imports/fight_enrichment_template.csv
 data/raw/imports/fight_enrichment.csv
+data/raw/imports/fighter_profile_enrichment.csv
 data/raw/enrichment_sources/
 !data/raw/enrichment_sources/
 !data/raw/enrichment_sources/**/

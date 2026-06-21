@@ -656,6 +656,149 @@ def load_scorecards(
     _print(f"Imported {len(frame)} scorecard rows.")
 
 
+@app.command("update-after-card")
+def update_after_card(
+    event_url: str = typer.Option(..., "--event-url", help="Completed event URL or local CSV/HTML file."),
+    source: str = typer.Option("auto", "--source", help="Source parser: ufcstats, espn, or auto."),
+    staging_dir: Path = typer.Option(settings.raw_data_dir / "staging", help="Staging output directory."),
+) -> None:
+    from ufc_predictor.card_update import update_after_card as run_update_after_card
+
+    try:
+        report = run_update_after_card(event_url=event_url, source=source, staging_dir=staging_dir)
+    except Exception as exc:
+        _runtime_error(f"Post-card update failed:\n{type(exc).__name__}: {exc}")
+    _print(f"Staged post-card update from {report.source}.")
+    _print(f"Staging directory: {report.staging_dir}")
+    for name, path in report.files.items():
+        rows = report.rows_written.get(name)
+        suffix = f" rows={rows}" if rows is not None else ""
+        _print(f"- {name}: {path}{suffix}")
+    for warning in report.warnings:
+        _print(f"[yellow]Warning: {warning}[/yellow]")
+
+
+@app.command("validate-card-update")
+def validate_card_update(
+    staging_dir: Path = typer.Option(settings.raw_data_dir / "staging", help="Directory containing staged card update CSVs."),
+    imports_dir: Path = typer.Option(settings.raw_data_dir / "imports", help="Existing import directory to validate against."),
+) -> None:
+    from ufc_predictor.card_update import validate_card_update as run_validate_card_update
+
+    report = run_validate_card_update(staging_dir=staging_dir, imports_dir=imports_dir)
+    _print("Card update validation summary")
+    for name, count in report.counts.items():
+        _print(f"- {name}: {count}")
+    for warning in report.warnings:
+        _print(f"[yellow]Warning: {warning}[/yellow]")
+    for error in report.errors:
+        _print(f"[red]Error: {error}[/red]")
+    _print(f"Wrote validation report to {staging_dir / 'validation_report.json'}")
+    if not report.ok:
+        raise typer.Exit(1)
+    _print("Card update validation passed.")
+
+
+@app.command("apply-card-update")
+def apply_card_update(
+    staging_dir: Path = typer.Option(settings.raw_data_dir / "staging", help="Directory containing validated card update CSVs."),
+    imports_dir: Path = typer.Option(settings.raw_data_dir / "imports", help="Import directory to merge into."),
+    raw_dir: Path = typer.Option(settings.raw_data_dir, help="Raw data directory for raw scorecards/odds outputs and backups."),
+) -> None:
+    from ufc_predictor.card_update import apply_card_update as run_apply_card_update
+
+    try:
+        report = run_apply_card_update(staging_dir=staging_dir, imports_dir=imports_dir, raw_dir=raw_dir)
+    except InputDataError as exc:
+        _runtime_error(f"Card update merge failed:\n{exc}")
+    _print(f"Backup created: {report.backup_dir}")
+    _print("Rows added:")
+    for name, count in sorted(report.rows_added.items()):
+        _print(f"- {name}: {count}")
+    _print("Fields updated:")
+    if report.fields_updated:
+        for name, count in sorted(report.fields_updated.items()):
+            _print(f"- {name}: {count}")
+    else:
+        _print("- none")
+    _print("Skipped duplicates:")
+    for name, count in sorted(report.skipped_duplicates.items()):
+        _print(f"- {name}: {count}")
+    _print("Files written:")
+    for name, path in report.files_written.items():
+        _print(f"- {name}: {path}")
+
+
+@app.command("rebuild-after-update")
+def rebuild_after_update() -> None:
+    from ufc_predictor.card_update import run_rebuild_after_update
+
+    try:
+        results = run_rebuild_after_update()
+    except RuntimeError as exc:
+        _runtime_error(str(exc))
+    _print("Rebuild after update completed.")
+    for result in results:
+        _print(f"- {result['step']}: exit {result['returncode']}")
+
+
+@app.command("enrich-fighter-profiles")
+def enrich_fighter_profiles(
+    source: str = typer.Option("auto", "--source", help="Profile source: auto, local, or ufcstats."),
+    fighters_path: Path = typer.Option(settings.raw_data_dir / "imports" / "fighters.csv", help="fighters.csv to improve."),
+    source_dir: Path = typer.Option(settings.raw_data_dir / "enrichment_sources", help="External source CSV directory."),
+    output_path: Path = typer.Option(settings.raw_data_dir / "imports" / "fighter_profile_enrichment.csv", help="Profile enrichment CSV output."),
+    apply: bool = typer.Option(True, "--apply/--no-apply", help="Update missing fields in fighters.csv after validation."),
+) -> None:
+    from ufc_predictor.fighter_profiles import enrich_fighter_profiles as run_enrich_fighter_profiles
+
+    try:
+        report = run_enrich_fighter_profiles(
+            source=source,
+            fighters_path=fighters_path,
+            source_dir=source_dir,
+            output_path=output_path,
+            apply=apply,
+        )
+    except InputDataError as exc:
+        _runtime_error(f"Fighter profile enrichment failed:\n{exc}")
+    _print(f"Fighters read: {report.fighters_read}")
+    _print(f"Profile enrichment rows written: {report.enrichment_rows}")
+    _print(f"Fighters updated: {report.fighters_updated}")
+    _print(f"Output path: {report.output_path}")
+    _print(f"Report path: {report.report_path}")
+    _print("Fields updated:")
+    if report.fields_updated:
+        for field, count in sorted(report.fields_updated.items()):
+            _print(f"- {field}: {count}")
+    else:
+        _print("- none")
+    if report.source_files_used:
+        _print("Source files used:")
+        for path in report.source_files_used:
+            _print(f"- {path}")
+    for warning in report.warnings:
+        _print(f"[yellow]Warning: {warning}[/yellow]")
+
+
+@app.command("prepare-upcoming-card")
+def prepare_upcoming_card(
+    event_url: str = typer.Option(..., "--event-url", help="Upcoming event URL or local CSV/HTML file."),
+    output_path: Path = typer.Option(
+        settings.raw_data_dir / "staging" / "upcoming_card_predictions.csv",
+        "--output",
+        help="Prediction input template output path.",
+    ),
+) -> None:
+    from ufc_predictor.card_update import prepare_upcoming_card as run_prepare_upcoming_card
+
+    try:
+        frame, path = run_prepare_upcoming_card(event_url=event_url, output_path=output_path)
+    except Exception as exc:
+        _runtime_error(f"Upcoming card preparation failed:\n{type(exc).__name__}: {exc}")
+    _print(f"Wrote upcoming-card prediction template with {len(frame)} fights to {path}")
+
+
 @app.command("leakage-audit")
 def leakage_audit(
     sample_size: int = typer.Option(100, "--sample-size", help="Number of processed training rows to audit."),
@@ -1098,6 +1241,14 @@ def _ablation_groups() -> dict[str, list[str]]:
         "odds_features": ["market_", "closing_odds_"],
         "scorecard_history_features": ["scorecard", "decision", "judge_disagreement", "average_rounds_won"],
         "enrichment_features": ["weight_class", "event_location", "main_event", "title_fight", "scheduled_rounds"],
+        "physical_attributes": [
+            "physical",
+            "reach",
+            "height",
+            "stance_adjusted_reach",
+            "reach_per_height",
+            "both_reach_missing",
+        ],
         "style_features": ["style", "stance", "reach", "striker", "grappler", "pressure", "counter", "wrestling", "clash"],
         "elo_opponent_adjusted_features": ["elo", "opponent_adjusted", "opponent_elo", "strength_of_schedule", "best_win", "worst_loss"],
         "recent_form_features": ["last_", "recent_", "streak", "days_since", "fights_past", "layoff", "turnaround", "trend"],
@@ -1142,6 +1293,8 @@ def ablation_report(
             "dropped_columns": dropped_columns,
             "dropped_column_count": len(dropped_columns),
             "metrics": metrics,
+            "odds_covered_accuracy": metrics.get("model_vs_market", {}).get("model_accuracy"),
+            "modern_era_accuracy": metrics.get("performance_by_modern_era", {}).get("2020+", {}).get("accuracy"),
         }
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(results, indent=2, default=str), encoding="utf-8")
@@ -1151,7 +1304,9 @@ def ablation_report(
         _print(
             f"- {group}: dropped={payload.get('dropped_column_count', 0)} "
             f"accuracy={metrics.get('accuracy')} log_loss={metrics.get('log_loss')} "
-            f"calibration_error={metrics.get('expected_calibration_error')}"
+            f"calibration_error={metrics.get('expected_calibration_error')} "
+            f"odds_covered_accuracy={payload.get('odds_covered_accuracy')} "
+            f"modern_era_accuracy={payload.get('modern_era_accuracy')}"
         )
     _print(f"Wrote ablation report to {output}")
 
@@ -1231,6 +1386,101 @@ def predict(
         show_value_analysis=show_value_analysis,
     )
     _print_json(prediction)
+
+
+@app.command("predict-card")
+def predict_card(
+    file: Path = typer.Option(..., "--file", help="CSV created by prepare-upcoming-card or manually filled."),
+    model_mode: str = typer.Option("pure", "--model-mode", help="Prediction mode: pure or market-aware."),
+    show_value_analysis: bool = typer.Option(False, "--show-value-analysis", help="Show cautious market edge/value analysis when odds are supplied."),
+    model_path: Path = typer.Option(settings.model_dir / "ufc_predictor_model.pkl", help="Trained model path."),
+    fights_csv: Path = typer.Option(settings.raw_data_dir / "fights.csv", help="Historical fights CSV."),
+    fight_stats_csv: Path = typer.Option(settings.raw_data_dir / "fight_stats.csv", help="Optional fight stats CSV."),
+    fighters_csv: Path = typer.Option(settings.raw_data_dir / "fighters.csv", help="Optional fighters CSV."),
+    scorecards_csv: Path = typer.Option(settings.raw_data_dir / "scorecards.csv", help="Optional scorecards CSV."),
+    odds_csv: Path = typer.Option(settings.raw_data_dir / "odds.csv", help="Optional odds CSV for market-aware predictions."),
+) -> None:
+    from ufc_predictor.models.predict import predict_fight
+    from ufc_predictor.odds import american_odds_to_implied_probability, is_valid_american_odds
+
+    card = read_required_csv(file, required_columns=["fighter_a", "fighter_b", "date", "weight_class", "scheduled_rounds"], label="upcoming-card predictions CSV")
+    fights = read_optional_csv(fights_csv, label="fights CSV")
+    if fights is None:
+        fights = pd.DataFrame()
+    fight_stats = read_optional_csv(fight_stats_csv, label="fight stats CSV")
+    fighters = read_optional_csv(fighters_csv, label="fighters CSV")
+    scorecards = read_optional_csv(scorecards_csv, label="scorecards CSV")
+    global_odds = read_optional_csv(odds_csv, label="odds CSV")
+    model = model_path if model_path.exists() else None
+    predictions: list[dict] = []
+    for _, row in card.iterrows():
+        fighter_a = str(row.get("fighter_a", "")).strip()
+        fighter_b = str(row.get("fighter_b", "")).strip()
+        date = str(row.get("date", "")).strip()
+        odds = global_odds
+        fighter_a_odds = row.get("fighter_a_odds")
+        fighter_b_odds = row.get("fighter_b_odds")
+        has_a_odds = pd.notna(fighter_a_odds) and str(fighter_a_odds).strip() != ""
+        has_b_odds = pd.notna(fighter_b_odds) and str(fighter_b_odds).strip() != ""
+        if has_a_odds or has_b_odds:
+            if not (has_a_odds and has_b_odds):
+                _runtime_error(f"Both odds columns are required for {fighter_a} vs {fighter_b}.")
+            if not is_valid_american_odds(fighter_a_odds) or not is_valid_american_odds(fighter_b_odds):
+                _runtime_error(f"Invalid American odds for {fighter_a} vs {fighter_b}.")
+            implied_a = american_odds_to_implied_probability(fighter_a_odds)
+            implied_b = american_odds_to_implied_probability(fighter_b_odds)
+            probability_sum = float(implied_a or 0.0) + float(implied_b or 0.0)
+            odds = pd.DataFrame(
+                [
+                    {
+                        "fight_date": date,
+                        "event": "",
+                        "fighter_a": fighter_a,
+                        "fighter_b": fighter_b,
+                        "sportsbook": "manual_input",
+                        "fighter_a_odds": fighter_a_odds,
+                        "fighter_b_odds": fighter_b_odds,
+                        "timestamp": "",
+                        "source_file": "manual_input",
+                        "fighter_a_implied_probability": implied_a,
+                        "fighter_b_implied_probability": implied_b,
+                        "fighter_a_no_vig_probability": float(implied_a or 0.0) / probability_sum if probability_sum > 0 else pd.NA,
+                        "fighter_b_no_vig_probability": float(implied_b or 0.0) / probability_sum if probability_sum > 0 else pd.NA,
+                        "market_probability_sum": probability_sum,
+                    }
+                ]
+            )
+        prediction = predict_fight(
+            model=model,
+            fighter_a=fighter_a,
+            fighter_b=fighter_b,
+            fight_date=date,
+            weight_class=str(row.get("weight_class", "Unknown")),
+            scheduled_rounds=int(pd.to_numeric(pd.Series([row.get("scheduled_rounds", 3)]), errors="coerce").fillna(3).iloc[0]),
+            fights=fights,
+            fight_stats=fight_stats,
+            fighters=fighters,
+            scorecards=scorecards,
+            odds=odds,
+            model_mode=model_mode,
+            show_value_analysis=show_value_analysis,
+            extra_context={
+                "main_event": row.get("main_event", 0),
+                "title_fight": row.get("title_fight", 0),
+            },
+        )
+        predictions.append(prediction)
+    summary = [
+        {
+            "fight": f"{item['fighter_a']} vs {item['fighter_b']}",
+            "predicted_winner": item.get("predicted_winner"),
+            "final_probability_used": item.get("final_probability_used"),
+            "confidence_tier": item.get("confidence_tier"),
+            "value_label": item.get("value_label"),
+        }
+        for item in predictions
+    ]
+    _print_json({"predictions": predictions, "summary": summary, "count": len(predictions)})
 
 
 if __name__ == "__main__":  # pragma: no cover

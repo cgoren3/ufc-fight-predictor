@@ -330,6 +330,98 @@ ufc-predict report
 
 The report includes data-quality coverage percentages for known `weight_class`, known `event_location`, known `main_event`, matched odds, and matched scorecards.
 
+## Post-Card Updates
+
+After a completed UFC card, stage the new data first. Staging is intentional: the scraper/parser should not blindly overwrite your historical imports.
+
+```bash
+ufc-predict update-after-card --event-url "EVENT_URL" --source auto
+ufc-predict validate-card-update
+ufc-predict apply-card-update
+```
+
+`update-after-card` writes only staging files:
+
+- `data/raw/staging/new_fights.csv`
+- `data/raw/staging/new_fight_stats.csv`
+- `data/raw/staging/new_scorecards.csv`
+- `data/raw/staging/new_fighters.csv`
+- `data/raw/staging/new_event_enrichment.csv`
+- `data/raw/staging/new_odds.csv` when odds are available
+- `data/raw/staging/update_report.json`
+
+`validate-card-update` checks duplicates, required fields, winner validity, future dates, numeric stat fields, scorecards on decision fights, fighter-name normalization, and leakage safety for fight enrichment. It writes `data/raw/staging/validation_report.json`.
+
+`apply-card-update` merges validated staging data into `data/raw/imports/`, creates a timestamped backup under `data/raw/backups/YYYY-MM-DD_HHMMSS/`, skips duplicate fights, and only fills missing fighter profile fields with non-empty new values. Existing manually corrected values are preserved.
+
+For a full rebuild after a validated staged update:
+
+```bash
+ufc-predict rebuild-after-update
+```
+
+This runs validation, apply, dataset build, training, pure and market-aware backtests, model-mode comparison, leakage audit, and report generation. If a step fails, it stops and prints the failed step.
+
+Scraping can fail if a source site blocks requests or changes HTML. When that happens, use the manual CSV path: create the same staging CSV files under `data/raw/staging/`, run `ufc-predict validate-card-update`, then `ufc-predict apply-card-update`.
+
+## Fighter Profile Enrichment
+
+Reach, height, stance, DOB, nickname, and weight-class coverage can be improved from local enrichment CSVs, UFCStats fighter profile URLs when available, or manual CSVs.
+
+```bash
+ufc-predict enrich-fighter-profiles --source auto
+```
+
+The command writes:
+
+- `data/raw/imports/fighter_profile_enrichment.csv`
+- `data/raw/staging/fighter_profile_enrichment_report.json`
+
+It prefers existing local data, then external CSVs under `data/raw/enrichment_sources/`, then UFCStats profile pages only when a fighter has a usable UFCStats profile URL. Requests use the project scraper cache, retries, and rate limiting. It does not bypass anti-bot protection.
+
+Manual fallback files can be placed under `data/raw/imports/` as `fighter_profile_enrichment_manual.csv` or `fighter_profiles.csv` with columns such as:
+
+```csv
+name,nickname,height_in,weight_lb,reach_in,stance,date_of_birth,weight_class,source_url
+```
+
+Existing non-empty fields in `fighters.csv` are not overwritten.
+
+## Upcoming Cards
+
+Create a prediction template for an upcoming card:
+
+```bash
+ufc-predict prepare-upcoming-card --event-url "EVENT_URL"
+```
+
+This writes `data/raw/staging/upcoming_card_predictions.csv` with:
+
+```csv
+fighter_a,fighter_b,date,weight_class,scheduled_rounds,fighter_a_odds,fighter_b_odds,main_event,title_fight
+```
+
+Fill missing odds or context manually if needed, then run:
+
+```bash
+ufc-predict predict-card --file data/raw/staging/upcoming_card_predictions.csv --model-mode market-aware --show-value-analysis
+```
+
+Manual odds are used only for that prediction run unless you explicitly import odds into `data/raw/imports/odds.csv`.
+
+## Local Artifacts
+
+Generated models, processed datasets, staging files, backups, reports, and scraper caches are local artifacts. They should normally be regenerated rather than committed:
+
+```bash
+ufc-predict build-dataset --verbose
+ufc-predict train
+ufc-predict backtest --model-mode market-aware
+ufc-predict compare-model-modes
+ufc-predict leakage-audit --sample-size 100
+ufc-predict report
+```
+
 ## Predict
 
 ```bash

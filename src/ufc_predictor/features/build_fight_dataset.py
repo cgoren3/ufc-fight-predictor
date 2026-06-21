@@ -121,6 +121,51 @@ def _difference_features(a_snapshot: dict[str, Any], b_snapshot: dict[str, Any])
     return output
 
 
+def _numeric(value: Any, default: float = 0.0) -> float:
+    try:
+        if pd.isna(value):
+            return default
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _physical_attribute_features(a_snapshot: dict[str, Any], b_snapshot: dict[str, Any]) -> dict[str, float]:
+    a_reach = _numeric(a_snapshot.get("reach_in"))
+    b_reach = _numeric(b_snapshot.get("reach_in"))
+    a_height = _numeric(a_snapshot.get("height_in"))
+    b_height = _numeric(b_snapshot.get("height_in"))
+    a_reach_missing = float(a_reach <= 0)
+    b_reach_missing = float(b_reach <= 0)
+    reach_difference = a_reach - b_reach if not (a_reach_missing or b_reach_missing) else 0.0
+    height_difference = a_height - b_height if a_height > 0 and b_height > 0 else 0.0
+    a_reach_per_height = a_reach / a_height if a_reach > 0 and a_height > 0 else 0.0
+    b_reach_per_height = b_reach / b_height if b_reach > 0 and b_height > 0 else 0.0
+    stance_a = str(a_snapshot.get("stance", "")).lower()
+    stance_b = str(b_snapshot.get("stance", "")).lower()
+    stance_edge = 0.0
+    if "southpaw" in stance_a and "orthodox" in stance_b:
+        stance_edge = 0.5
+    elif "orthodox" in stance_a and "southpaw" in stance_b:
+        stance_edge = -0.5
+    return {
+        "fighter_a_reach": a_reach,
+        "fighter_b_reach": b_reach,
+        "reach_difference": reach_difference,
+        "absolute_reach_difference": abs(reach_difference),
+        "reach_advantage": float(np.sign(reach_difference)) if reach_difference else 0.0,
+        "fighter_a_reach_per_height": a_reach_per_height,
+        "fighter_b_reach_per_height": b_reach_per_height,
+        "reach_per_height": a_reach_per_height - b_reach_per_height,
+        "height_difference": height_difference,
+        "height_reach_interaction": reach_difference * height_difference,
+        "stance_adjusted_reach_advantage": reach_difference + stance_edge,
+        "fighter_a_reach_missing": a_reach_missing,
+        "fighter_b_reach_missing": b_reach_missing,
+        "both_reach_missing": float(a_reach_missing and b_reach_missing),
+    }
+
+
 def _row_for_order(
     fight_row: pd.Series,
     fighter_a: str,
@@ -184,6 +229,7 @@ def _row_for_order(
     row.update(_prefix_snapshot("fighter_a", a_snapshot))
     row.update(_prefix_snapshot("fighter_b", b_snapshot))
     row.update(_difference_features(a_snapshot, b_snapshot))
+    row.update(_physical_attribute_features(a_snapshot, b_snapshot))
     row.update(style)
     return row
 
@@ -332,6 +378,20 @@ def build_fight_dataset(
         "fighter_b_pre_weight_class_elo",
         "fighter_a_elo_expected_win_probability",
         "fighter_b_elo_expected_win_probability",
+        "fighter_a_reach",
+        "fighter_b_reach",
+        "reach_difference",
+        "absolute_reach_difference",
+        "reach_advantage",
+        "fighter_a_reach_per_height",
+        "fighter_b_reach_per_height",
+        "reach_per_height",
+        "height_difference",
+        "height_reach_interaction",
+        "stance_adjusted_reach_advantage",
+        "fighter_a_reach_missing",
+        "fighter_b_reach_missing",
+        "both_reach_missing",
     }
     for column in sorted(numeric_columns & set(dataset.columns)):
         dataset[column] = pd.to_numeric(dataset[column], errors="coerce")
