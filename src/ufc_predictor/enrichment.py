@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+import re
+import unicodedata
 
 import pandas as pd
 
@@ -36,6 +38,8 @@ MISSING_ENRICHMENT_GUIDANCE = (
     "Run ufc-predict build-enrichment-template, fill in the missing columns, "
     "save it as data/raw/imports/fight_enrichment.csv, then rerun import-enrichment."
 )
+EXTERNAL_SOURCE_SUFFIXES = {".csv"}
+TITLE_EVENT_TERMS = ("title", "championship", "belt", "interim")
 
 
 class EnrichmentError(InputDataError):
@@ -92,6 +96,52 @@ class EnrichmentSummary:
         }
 
 
+@dataclass
+class ExternalEnrichmentSourceReport:
+    path: Path
+    rows_read: int = 0
+    matched_rows: int = 0
+    unmatched_rows: int = 0
+    updated_fields: dict[str, int] = field(default_factory=dict)
+    warnings: list[str] = field(default_factory=list)
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "path": str(self.path),
+            "rows_read": self.rows_read,
+            "matched_rows": self.matched_rows,
+            "unmatched_rows": self.unmatched_rows,
+            "updated_fields": self.updated_fields,
+            "warnings": self.warnings,
+        }
+
+
+@dataclass
+class AutoEnrichmentReport:
+    template_path: Path
+    output_path: Path
+    total_rows: int
+    inferred_main_event_rows: int = 0
+    inferred_non_main_event_rows: int = 0
+    inferred_title_fight_rows: int = 0
+    inferred_non_title_fight_rows: int = 0
+    external_sources: list[ExternalEnrichmentSourceReport] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "template_path": str(self.template_path),
+            "output_path": str(self.output_path),
+            "total_rows": self.total_rows,
+            "inferred_main_event_rows": self.inferred_main_event_rows,
+            "inferred_non_main_event_rows": self.inferred_non_main_event_rows,
+            "inferred_title_fight_rows": self.inferred_title_fight_rows,
+            "inferred_non_title_fight_rows": self.inferred_non_title_fight_rows,
+            "external_sources": [source.as_dict() for source in self.external_sources],
+            "warnings": self.warnings,
+        }
+
+
 def _clean(value: Any) -> str:
     if value is None or pd.isna(value):
         return ""
@@ -99,7 +149,9 @@ def _clean(value: Any) -> str:
 
 
 def _key_text(value: Any) -> str:
-    return _clean(value).lower()
+    text = unicodedata.normalize("NFKD", _clean(value))
+    text = "".join(character for character in text if not unicodedata.combining(character))
+    return re.sub(r"[^a-z0-9]+", " ", text.lower()).strip()
 
 
 def _date_key(value: Any) -> str:
@@ -138,6 +190,14 @@ def _enrichment_key(row: pd.Series | dict[str, Any]) -> str:
 
 def _event_key(event: Any, fight_date: Any) -> str:
     return "||".join([_date_key(fight_date), _key_text(event)])
+
+
+def _date_pair_key(fight_date: Any, fighter_a: Any, fighter_b: Any) -> str:
+    return "||".join([_date_key(fight_date), _pair_key(fighter_a, fighter_b)])
+
+
+def _event_pair_key(event: Any, fighter_a: Any, fighter_b: Any) -> str:
+    return "||".join([_key_text(event), _pair_key(fighter_a, fighter_b)])
 
 
 def is_unknown_weight_class(value: Any) -> bool:
@@ -185,6 +245,19 @@ def _series_or_blank(frame: pd.DataFrame, column: str) -> pd.Series:
     return pd.Series([""] * len(frame), index=frame.index)
 
 
+def _first_present(row: pd.Series | dict[str, Any], columns: list[str]) -> Any:
+    for column in columns:
+        if column in row and _non_empty(row.get(column)):
+            return row.get(column)
+    return ""
+
+
+def _canonical_columns(frame: pd.DataFrame) -> pd.DataFrame:
+    output = frame.copy()
+    output.columns = [str(column).strip().lower().replace(" ", "_") for column in output.columns]
+    return output
+
+
 def _has_positive_binary(series: pd.Series) -> bool:
     numeric = pd.to_numeric(series, errors="coerce")
     return bool(numeric.eq(1).any())
@@ -195,9 +268,7 @@ def _known_binary_mask(series: pd.Series) -> pd.Series:
     if values.empty:
         return pd.Series([False] * len(series), index=series.index)
     numeric = pd.to_numeric(series, errors="coerce")
-    if not bool(numeric.eq(1).any()):
-        return pd.Series([False] * len(series), index=series.index)
-    return numeric.isin([0, 1])
+    return values.ne("") & numeric.isin([0, 1])
 
 
 def enrichment_summary_from_frame(frame: pd.DataFrame, path: str | Path) -> EnrichmentSummary:
@@ -254,6 +325,92 @@ def _template_binary_value(series: pd.Series, value: Any) -> Any:
     return "" if normalized is None else normalized
 
 
+def _known_field(value: Any, field: str) -> bool:
+    if field == "weight_class":
+        return _non_empty(value) and not is_unknown_weight_class(value)
+    if field in {"main_event", "title_fight"}:
+        return _normalize_binary(value, field) is not None if _non_empty(value) else False
+    if field == "scheduled_rounds":
+        return _normalize_scheduled_rounds(value) is not None if _non_empty(value) else False
+    return _non_empty(value)
+
+
+def _safe_field_value(value: Any, field: str) -> Any:
+    if field == "weight_class":
+        return _clean(value) if _known_field(value, field) else ""
+    if field == "event_location":
+        return _clean(value) if _non_empty(value) else ""
+    if field in {"main_event", "title_fight"}:
+        normalized = _normalize_binary(value, field)
+        return "" if normalized is None else normalized
+    if field == "scheduled_rounds":
+        normalized = _normalize_scheduled_rounds(value)
+        return "" if normalized is None else normalized
+    return value
+
+
+def _set_if_known(frame: pd.DataFrame, index: Any, field: str, raw_value: Any) -> bool:
+    value = _safe_field_value(raw_value, field)
+    if not _non_empty(value) and value != 0:
+        return False
+    current = frame.at[index, field] if field in frame.columns else ""
+    if str(current) == str(value):
+        return False
+    frame.at[index, field] = value
+    return True
+
+
+def _fighter_aliases(name: Any) -> set[str]:
+    text = _key_text(name)
+    tokens = [token for token in text.split() if token not in {"jr", "sr", "ii", "iii", "iv"}]
+    aliases = {text}
+    if tokens:
+        aliases.add(tokens[-1])
+    if len(tokens) >= 2:
+        aliases.add(" ".join(tokens[-2:]))
+    return {alias for alias in aliases if alias}
+
+
+def _parse_vs_pair(text: Any) -> tuple[str, str] | None:
+    cleaned = _key_text(text)
+    if not cleaned:
+        return None
+    match = re.search(r"\b(.+?)\s+(?:vs|v|versus)\s+(.+)$", cleaned)
+    if not match:
+        return None
+    left = re.sub(r"\b\d+\b.*$", "", match.group(1)).strip()
+    right = re.sub(r"\b\d+\b.*$", "", match.group(2)).strip()
+    right = re.sub(r"\s+(?:fight night|ufc|dwcs|road to ufc).*$", "", right).strip()
+    return (left, right) if left and right else None
+
+
+def _alias_matches(candidate: str, aliases: set[str]) -> bool:
+    candidate = _key_text(candidate)
+    if not candidate:
+        return False
+    return any(candidate == alias or candidate in alias or alias in candidate for alias in aliases)
+
+
+def _event_mentions_matchup(event: Any, fighter_a: Any, fighter_b: Any) -> bool:
+    event_key = _key_text(event)
+    aliases_a = _fighter_aliases(fighter_a)
+    aliases_b = _fighter_aliases(fighter_b)
+    if any(alias and alias in event_key for alias in aliases_a) and any(alias and alias in event_key for alias in aliases_b):
+        return True
+    parsed = _parse_vs_pair(event)
+    if parsed is None:
+        return False
+    left, right = parsed
+    return (_alias_matches(left, aliases_a) and _alias_matches(right, aliases_b)) or (
+        _alias_matches(left, aliases_b) and _alias_matches(right, aliases_a)
+    )
+
+
+def _event_indicates_title(event: Any) -> bool:
+    event_key = _key_text(event)
+    return any(term in event_key.split() for term in TITLE_EVENT_TERMS)
+
+
 def build_enrichment_template(
     fights_path: str | Path | None = None,
     output_path: str | Path | None = None,
@@ -293,6 +450,227 @@ def build_enrichment_template(
     output.parent.mkdir(parents=True, exist_ok=True)
     frame.to_csv(output, index=False)
     return frame, output
+
+
+def _ensure_working_enrichment_frame(frame: pd.DataFrame) -> pd.DataFrame:
+    output = frame.copy()
+    for column in ENRICHMENT_COLUMNS:
+        if column not in output.columns:
+            output[column] = ""
+    output = output[ENRICHMENT_COLUMNS]
+    for column in ENRICHMENT_COLUMNS:
+        output[column] = output[column].astype("object").where(pd.notna(output[column]), "")
+    return output
+
+
+def _infer_main_events(frame: pd.DataFrame) -> tuple[pd.DataFrame, int, int]:
+    output = frame.copy()
+    matches = output.apply(lambda row: _event_mentions_matchup(row.get("event"), row.get("fighter_a"), row.get("fighter_b")), axis=1)
+    event_keys = output.apply(lambda row: _event_key(row.get("event"), row.get("fight_date")), axis=1)
+    main_count = 0
+    non_main_count = 0
+    for _, group in output.groupby(event_keys):
+        group_matches = matches.loc[group.index]
+        if int(group_matches.sum()) != 1:
+            continue
+        main_index = group_matches.loc[group_matches].index[0]
+        if not _known_field(output.at[main_index, "main_event"], "main_event"):
+            output.at[main_index, "main_event"] = 1
+            main_count += 1
+        for index in group.index:
+            if index == main_index:
+                continue
+            if not _known_field(output.at[index, "main_event"], "main_event"):
+                output.at[index, "main_event"] = 0
+                non_main_count += 1
+    return output, main_count, non_main_count
+
+
+def _infer_title_fights(frame: pd.DataFrame) -> tuple[pd.DataFrame, int, int]:
+    output = frame.copy()
+    title_count = 0
+    non_title_count = 0
+    for index, row in output.iterrows():
+        if _known_field(row.get("title_fight"), "title_fight"):
+            continue
+        scheduled = _normalize_scheduled_rounds(row.get("scheduled_rounds")) if _non_empty(row.get("scheduled_rounds")) else None
+        if scheduled == 5 or _event_indicates_title(row.get("event")):
+            output.at[index, "title_fight"] = 1
+            title_count += 1
+        elif scheduled == 3:
+            output.at[index, "title_fight"] = 0
+            non_title_count += 1
+    return output, title_count, non_title_count
+
+
+def _split_bout(value: Any) -> tuple[str, str] | None:
+    parsed = _parse_vs_pair(value)
+    if parsed is not None:
+        return parsed
+    text = _clean(value)
+    if not text:
+        return None
+    for delimiter in [" vs. ", " vs ", " v. ", " v ", " versus "]:
+        if delimiter in text.lower():
+            parts = re.split(re.escape(delimiter), text, maxsplit=1, flags=re.IGNORECASE)
+            if len(parts) == 2 and _non_empty(parts[0]) and _non_empty(parts[1]):
+                return _clean(parts[0]), _clean(parts[1])
+    return None
+
+
+def _external_row_to_payload(row: pd.Series) -> dict[str, Any]:
+    fighter_a = _first_present(row, ["fighter_a", "red_fighter", "r_fighter", "fight_fighter"])
+    fighter_b = _first_present(row, ["fighter_b", "blue_fighter", "b_fighter", "opponent"])
+    bout = _first_present(row, ["bout", "matchup", "fight", "fighters"])
+    if (not _non_empty(fighter_a) or not _non_empty(fighter_b)) and _non_empty(bout):
+        parsed = _split_bout(bout)
+        if parsed is not None:
+            fighter_a, fighter_b = parsed
+    return {
+        "fight_date": _first_present(row, ["fight_date", "event_date", "date"]),
+        "event": _first_present(row, ["event", "event_name"]),
+        "fighter_a": fighter_a,
+        "fighter_b": fighter_b,
+        "weight_class": _first_present(row, ["weight_class", "division", "class"]),
+        "event_location": _first_present(row, ["event_location", "location", "venue"]),
+        "main_event": _first_present(row, ["main_event", "is_main_event"]),
+        "title_fight": _first_present(row, ["title_fight", "is_title_fight", "championship", "title"]),
+        "scheduled_rounds": _first_present(row, ["scheduled_rounds", "no_of_rounds", "rounds"]),
+    }
+
+
+def _unique_mapping(keys: pd.Series) -> dict[str, Any]:
+    mapping: dict[str, Any] = {}
+    counts = keys.value_counts()
+    for index, key in keys.items():
+        if key and counts.get(key, 0) == 1:
+            mapping[str(key)] = index
+    return mapping
+
+
+def _merge_external_fight_row(
+    frame: pd.DataFrame,
+    payload: dict[str, Any],
+    date_pair_to_index: dict[str, Any],
+    event_pair_to_index: dict[str, Any],
+    updated_fields: dict[str, int],
+) -> bool:
+    index = None
+    if _non_empty(payload.get("fighter_a")) and _non_empty(payload.get("fighter_b")):
+        date_key = _date_pair_key(payload.get("fight_date"), payload.get("fighter_a"), payload.get("fighter_b"))
+        event_key = _event_pair_key(payload.get("event"), payload.get("fighter_a"), payload.get("fighter_b"))
+        index = date_pair_to_index.get(date_key)
+        if index is None:
+            index = event_pair_to_index.get(event_key)
+    if index is None:
+        return False
+    for field in ENRICHABLE_FIELDS:
+        try:
+            if _set_if_known(frame, index, field, payload.get(field)):
+                updated_fields[field] += 1
+        except EnrichmentError:
+            continue
+    return True
+
+
+def _merge_external_event_row(
+    frame: pd.DataFrame,
+    payload: dict[str, Any],
+    event_to_indices: dict[str, list[Any]],
+    updated_fields: dict[str, int],
+) -> bool:
+    event_key = _event_key(payload.get("event"), payload.get("fight_date"))
+    indices = event_to_indices.get(event_key, [])
+    if not indices:
+        return False
+    for index in indices:
+        try:
+            if _set_if_known(frame, index, "event_location", payload.get("event_location")):
+                updated_fields["event_location"] += 1
+        except EnrichmentError:
+            continue
+    if len(indices) == 1:
+        index = indices[0]
+        for field in ["weight_class", "main_event", "title_fight", "scheduled_rounds"]:
+            try:
+                if _set_if_known(frame, index, field, payload.get(field)):
+                    updated_fields[field] += 1
+            except EnrichmentError:
+                continue
+    return True
+
+
+def merge_external_enrichment_sources(
+    frame: pd.DataFrame,
+    source_dir: str | Path | None = None,
+) -> tuple[pd.DataFrame, list[ExternalEnrichmentSourceReport]]:
+    directory = Path(source_dir) if source_dir else settings.raw_data_dir / "enrichment_sources"
+    output = frame.copy()
+    if not directory.exists():
+        return output, []
+
+    date_pair_keys = output.apply(lambda row: _date_pair_key(row.get("fight_date"), row.get("fighter_a"), row.get("fighter_b")), axis=1)
+    event_pair_keys = output.apply(lambda row: _event_pair_key(row.get("event"), row.get("fighter_a"), row.get("fighter_b")), axis=1)
+    date_pair_to_index = _unique_mapping(date_pair_keys)
+    event_pair_to_index = _unique_mapping(event_pair_keys)
+    event_keys = output.apply(lambda row: _event_key(row.get("event"), row.get("fight_date")), axis=1)
+    event_to_indices: dict[str, list[Any]] = {}
+    for index, key in event_keys.items():
+        event_to_indices.setdefault(str(key), []).append(index)
+
+    reports: list[ExternalEnrichmentSourceReport] = []
+    for path in sorted(directory.iterdir()):
+        if not path.is_file() or path.suffix.lower() not in EXTERNAL_SOURCE_SUFFIXES:
+            continue
+        report = ExternalEnrichmentSourceReport(path=path, updated_fields={field: 0 for field in ENRICHABLE_FIELDS})
+        try:
+            raw = _canonical_columns(pd.read_csv(path))
+        except Exception as exc:
+            report.warnings.append(f"Could not read enrichment source: {type(exc).__name__}: {exc}")
+            reports.append(report)
+            continue
+        report.rows_read = int(len(raw))
+        for _, row in raw.iterrows():
+            payload = _external_row_to_payload(row)
+            has_pair = _non_empty(payload.get("fighter_a")) and _non_empty(payload.get("fighter_b"))
+            matched = False
+            if has_pair:
+                matched = _merge_external_fight_row(output, payload, date_pair_to_index, event_pair_to_index, report.updated_fields)
+            if not matched:
+                matched = _merge_external_event_row(output, payload, event_to_indices, report.updated_fields)
+            if matched:
+                report.matched_rows += 1
+            else:
+                report.unmatched_rows += 1
+        reports.append(report)
+    return output, reports
+
+
+def auto_enrich(
+    template_path: str | Path | None = None,
+    output_path: str | Path | None = None,
+    source_dir: str | Path | None = None,
+) -> tuple[pd.DataFrame, AutoEnrichmentReport]:
+    template = Path(template_path) if template_path else settings.raw_data_dir / "imports" / "fight_enrichment_template.csv"
+    output = Path(output_path) if output_path else settings.raw_data_dir / "imports" / "fight_enrichment.csv"
+    inspect_csv(template, required_columns=ENRICHMENT_COLUMNS, require_rows=True, label="fight enrichment template CSV")
+    frame = _ensure_working_enrichment_frame(pd.read_csv(template))
+    frame, inferred_main, inferred_non_main = _infer_main_events(frame)
+    frame, inferred_title, inferred_non_title = _infer_title_fights(frame)
+    frame, source_reports = merge_external_enrichment_sources(frame, source_dir=source_dir)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    frame.to_csv(output, index=False)
+    report = AutoEnrichmentReport(
+        template_path=template,
+        output_path=output,
+        total_rows=int(len(frame)),
+        inferred_main_event_rows=inferred_main,
+        inferred_non_main_event_rows=inferred_non_main,
+        inferred_title_fight_rows=inferred_title,
+        inferred_non_title_fight_rows=inferred_non_title,
+        external_sources=source_reports,
+    )
+    return frame, report
 
 
 def validate_enrichment_frame(frame: pd.DataFrame) -> list[str]:

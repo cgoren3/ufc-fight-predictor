@@ -254,6 +254,7 @@ def enrichment_summary(
     path: Optional[Path] = typer.Option(
         None,
         "--path",
+        "--file",
         help="Enrichment/template CSV to summarize. Defaults to fight_enrichment.csv, then template, then imports fights.csv.",
     ),
 ) -> None:
@@ -270,6 +271,45 @@ def enrichment_summary(
     _print(f"Known main_event: {summary.known_main_event_pct:.1f}%")
     _print(f"Known title_fight: {summary.known_title_fight_pct:.1f}%")
     _print(f"Known scheduled_rounds: {summary.known_scheduled_rounds_pct:.1f}%")
+
+
+@app.command("auto-enrich")
+def auto_enrich(
+    template_path: Path = typer.Option(
+        settings.raw_data_dir / "imports" / "fight_enrichment_template.csv",
+        help="Template CSV created by build-enrichment-template.",
+    ),
+    output_path: Path = typer.Option(
+        settings.raw_data_dir / "imports" / "fight_enrichment.csv",
+        help="Auto-enriched fight enrichment CSV output path.",
+    ),
+    source_dir: Path = typer.Option(
+        settings.raw_data_dir / "enrichment_sources",
+        help="Optional directory of external enrichment CSV files.",
+    ),
+) -> None:
+    from ufc_predictor.enrichment import auto_enrich as run_auto_enrich
+
+    try:
+        frame, report = run_auto_enrich(template_path=template_path, output_path=output_path, source_dir=source_dir)
+    except InputDataError as exc:
+        _runtime_error(f"Auto-enrichment failed:\n{exc}")
+    _print(f"Wrote auto-enriched fight_enrichment.csv with {len(frame)} rows to {report.output_path}")
+    _print(f"Inferred main_event=1 rows: {report.inferred_main_event_rows}")
+    _print(f"Inferred main_event=0 rows: {report.inferred_non_main_event_rows}")
+    _print(f"Inferred title_fight=1 rows: {report.inferred_title_fight_rows}")
+    _print(f"Inferred title_fight=0 rows: {report.inferred_non_title_fight_rows}")
+    if report.external_sources:
+        _print("External enrichment sources:")
+        for source in report.external_sources:
+            _print(f"- {source.path.name}: rows={source.rows_read}, matched={source.matched_rows}, unmatched={source.unmatched_rows}")
+            for field, count in source.updated_fields.items():
+                if count:
+                    _print(f"  {field}: {count}")
+            for warning in source.warnings:
+                _print(f"  [yellow]Warning: {warning}[/yellow]")
+    else:
+        _print(f"No external enrichment CSVs found under {source_dir}.")
 
 
 @app.command("import-enrichment")

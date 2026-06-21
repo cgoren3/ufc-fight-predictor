@@ -177,12 +177,14 @@ Use this when a Kaggle or third-party dataset has fight outcomes and stats but l
 
 ```bash
 ufc-predict build-enrichment-template
+ufc-predict auto-enrich
+ufc-predict enrichment-summary --file data/raw/imports/fight_enrichment.csv
 ufc-predict import-enrichment
 ufc-predict validate-imports
 ufc-predict import-csv
 ```
 
-Use `ufc-predict enrichment-summary` to check enrichment coverage. Full instructions are in `docs/enrichment.md`.
+Drop optional source CSVs under `data/raw/enrichment_sources/` before running `auto-enrich` to merge known locations, weight classes, or bout flags from external datasets. Use `ufc-predict enrichment-summary` to check enrichment coverage. Full instructions are in `docs/enrichment.md`.
 
 `build-dataset` automatically imports `data/raw/imports/fights.csv` when present. It refuses to build from bundled sample data unless `--use-sample-data` is passed, and it warns when fewer than 500 training rows are produced.
 
@@ -222,6 +224,7 @@ If the adapted file leaves `weight_class` as `Unknown`, `event_location` blank, 
 
 ```bash
 ufc-predict build-enrichment-template
+ufc-predict auto-enrich
 ufc-predict import-enrichment
 ufc-predict validate-imports
 ufc-predict import-csv

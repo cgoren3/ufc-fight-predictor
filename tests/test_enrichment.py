@@ -5,7 +5,7 @@ import pandas as pd
 from typer.testing import CliRunner
 
 from ufc_predictor.cli import app
-from ufc_predictor.enrichment import import_enrichment_csv
+from ufc_predictor.enrichment import auto_enrich, import_enrichment_csv
 from ufc_predictor.import_validation import validate_import_directory
 from ufc_predictor.models.evaluate import rolling_backtest
 from ufc_predictor.reporting import build_data_quality_coverage
@@ -177,6 +177,156 @@ def test_enrichment_summary_command(tmp_path) -> None:
     assert "Known event_location: 50.0%" in result.output
     assert "Known main_event: 100.0%" in result.output
     assert "Known scheduled_rounds: 100.0%" in result.output
+
+
+def test_auto_enrich_creates_file_and_infers_main_event_and_title(tmp_path) -> None:
+    template = tmp_path / "fight_enrichment_template.csv"
+    output = tmp_path / "fight_enrichment.csv"
+    pd.DataFrame(
+        [
+            {
+                "fight_date": "2020-01-01",
+                "event": "UFC Fight Night: Alpha vs. Beta",
+                "fighter_a": "Alice Alpha",
+                "fighter_b": "Beth Beta",
+                "weight_class": "Unknown",
+                "event_location": "",
+                "main_event": "",
+                "title_fight": "",
+                "scheduled_rounds": 5,
+            },
+            {
+                "fight_date": "2020-01-01",
+                "event": "UFC Fight Night: Alpha vs. Beta",
+                "fighter_a": "Cara Delta",
+                "fighter_b": "Dana Echo",
+                "weight_class": "Unknown",
+                "event_location": "",
+                "main_event": "",
+                "title_fight": "",
+                "scheduled_rounds": 3,
+            },
+        ]
+    ).to_csv(template, index=False)
+
+    result = runner.invoke(app, ["auto-enrich", "--template-path", str(template), "--output-path", str(output)])
+
+    assert result.exit_code == 0
+    assert output.exists()
+    enriched = pd.read_csv(output)
+    assert enriched.loc[0, "main_event"] == 1
+    assert enriched.loc[1, "main_event"] == 0
+    assert enriched.loc[0, "title_fight"] == 1
+    assert enriched.loc[1, "title_fight"] == 0
+    assert enriched.loc[0, "weight_class"] == "Unknown"
+    assert pd.isna(enriched.loc[0, "event_location"])
+
+
+def test_auto_enrich_merges_external_sources(tmp_path) -> None:
+    template = tmp_path / "fight_enrichment_template.csv"
+    output = tmp_path / "fight_enrichment.csv"
+    source_dir = tmp_path / "sources"
+    source_dir.mkdir()
+    pd.DataFrame(
+        [
+            {
+                "fight_date": "2020-01-01",
+                "event": "UFC Fight Night: Alpha vs. Beta",
+                "fighter_a": "Alice Alpha",
+                "fighter_b": "Beth Beta",
+                "weight_class": "Unknown",
+                "event_location": "",
+                "main_event": "",
+                "title_fight": "",
+                "scheduled_rounds": 5,
+            }
+        ]
+    ).to_csv(template, index=False)
+    pd.DataFrame(
+        [
+            {
+                "event": "Different Event Name",
+                "date": "2020-01-01",
+                "location": "Las Vegas, Nevada, USA",
+                "weight_class": "Lightweight",
+                "bout": "Alice Alpha vs Beth Beta",
+                "main_event": 1,
+            }
+        ]
+    ).to_csv(source_dir / "external.csv", index=False)
+
+    frame, report = auto_enrich(template_path=template, output_path=output, source_dir=source_dir)
+
+    assert output.exists()
+    assert report.external_sources[0].matched_rows == 1
+    assert report.external_sources[0].unmatched_rows == 0
+    assert frame.loc[0, "weight_class"] == "Lightweight"
+    assert frame.loc[0, "event_location"] == "Las Vegas, Nevada, USA"
+    assert frame.loc[0, "main_event"] == 1
+
+
+def test_auto_enrich_does_not_overwrite_known_values_with_blanks(tmp_path) -> None:
+    template = tmp_path / "fight_enrichment_template.csv"
+    output = tmp_path / "fight_enrichment.csv"
+    source_dir = tmp_path / "sources"
+    source_dir.mkdir()
+    pd.DataFrame(
+        [
+            {
+                "fight_date": "2020-01-01",
+                "event": "UFC Fight Night: Alpha vs. Beta",
+                "fighter_a": "Alice Alpha",
+                "fighter_b": "Beth Beta",
+                "weight_class": "Lightweight",
+                "event_location": "Las Vegas",
+                "main_event": "",
+                "title_fight": "",
+                "scheduled_rounds": 5,
+            }
+        ]
+    ).to_csv(template, index=False)
+    pd.DataFrame(
+        [
+            {
+                "event": "UFC Fight Night: Alpha vs. Beta",
+                "date": "2020-01-01",
+                "location": "",
+                "weight_class": "",
+                "bout": "Alice Alpha vs Beth Beta",
+                "main_event": "",
+            }
+        ]
+    ).to_csv(source_dir / "external.csv", index=False)
+
+    frame, _ = auto_enrich(template_path=template, output_path=output, source_dir=source_dir)
+
+    assert frame.loc[0, "weight_class"] == "Lightweight"
+    assert frame.loc[0, "event_location"] == "Las Vegas"
+
+
+def test_enrichment_summary_file_alias_works_on_fight_enrichment_csv(tmp_path) -> None:
+    path = tmp_path / "fight_enrichment.csv"
+    pd.DataFrame(
+        [
+            {
+                "fight_date": "2020-01-01",
+                "event": "UFC Fight Night: Alpha vs. Beta",
+                "fighter_a": "Alice Alpha",
+                "fighter_b": "Beth Beta",
+                "weight_class": "Lightweight",
+                "event_location": "Las Vegas",
+                "main_event": 1,
+                "title_fight": 1,
+                "scheduled_rounds": 5,
+            }
+        ]
+    ).to_csv(path, index=False)
+
+    result = runner.invoke(app, ["enrichment-summary", "--file", str(path)])
+
+    assert result.exit_code == 0
+    assert "Total fights: 1" in result.output
+    assert "Known weight_class: 100.0%" in result.output
 
 
 def test_import_enrichment_missing_file_error_points_to_template_workflow(tmp_path) -> None:

@@ -80,6 +80,8 @@ Apply it before importing normalized raw data:
 
 ```bash
 ufc-predict build-enrichment-template
+ufc-predict auto-enrich
+ufc-predict enrichment-summary --file data/raw/imports/fight_enrichment.csv
 ufc-predict import-enrichment
 ufc-predict validate-imports
 ufc-predict import-csv
@@ -87,7 +89,7 @@ ufc-predict import-csv
 
 If validation says enrichment values have not been applied, rerun `ufc-predict import-enrichment`.
 
-Use `ufc-predict enrichment-summary` to check coverage. See `docs/enrichment.md` for the full workflow and event-level enrichment rules.
+Place optional source CSVs under `data/raw/enrichment_sources/` before `auto-enrich` to merge known fields from external datasets. See `docs/enrichment.md` for the full workflow and event-level enrichment rules.
 
 ## Optional Odds
 
