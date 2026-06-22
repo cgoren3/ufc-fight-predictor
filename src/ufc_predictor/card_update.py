@@ -14,7 +14,7 @@ from typing import Any
 import pandas as pd
 
 from ufc_predictor.config import settings
-from ufc_predictor.data_io import InputDataError, read_optional_csv
+from ufc_predictor.data_io import InputDataError, inspect_csv, read_optional_csv
 from ufc_predictor.ingest.ufcstats_scraper import FIGHT_COLUMNS, FIGHT_STAT_COLUMNS, FIGHTER_COLUMNS, UFCStatsScraper
 
 
@@ -71,11 +71,48 @@ STAGING_COLUMNS: dict[str, list[str]] = {
 }
 
 
+MANUAL_CARD_COLUMNS = [
+    "event_name",
+    "event_date",
+    "fighter_a",
+    "fighter_b",
+    "winner",
+    "method",
+    "round",
+    "time",
+    "weight_class",
+    "scheduled_rounds",
+    "main_event",
+    "title_fight",
+    "fighter_a_kd",
+    "fighter_b_kd",
+    "fighter_a_sig_str_landed",
+    "fighter_a_sig_str_attempted",
+    "fighter_b_sig_str_landed",
+    "fighter_b_sig_str_attempted",
+    "fighter_a_total_str_landed",
+    "fighter_a_total_str_attempted",
+    "fighter_b_total_str_landed",
+    "fighter_b_total_str_attempted",
+    "fighter_a_td_landed",
+    "fighter_a_td_attempted",
+    "fighter_b_td_landed",
+    "fighter_b_td_attempted",
+    "fighter_a_sub_attempts",
+    "fighter_b_sub_attempts",
+    "fighter_a_control_time",
+    "fighter_b_control_time",
+    "fighter_a_odds",
+    "fighter_b_odds",
+]
+
+
 @dataclass
 class CardUpdateReport:
     event_url: str
     source: str
     staging_dir: Path
+    status: str = "staged"
     files: dict[str, Path] = field(default_factory=dict)
     rows_written: dict[str, int] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
@@ -85,6 +122,7 @@ class CardUpdateReport:
         return {
             "event_url": self.event_url,
             "source": self.source,
+            "status": self.status,
             "staging_dir": str(self.staging_dir),
             "files": {name: str(path) for name, path in self.files.items()},
             "rows_written": self.rows_written,
@@ -284,6 +322,35 @@ def _parse_seconds(value: Any) -> float | None:
         except ValueError:
             return None
     return _parse_numeric(text)
+
+
+def _manual_control_seconds(value: Any) -> Any:
+    parsed = _parse_seconds(value)
+    return parsed if parsed is not None else value
+
+
+def _manual_flag(value: Any, default: int = 0) -> Any:
+    flag = _truthy_flag(value)
+    return default if pd.isna(flag) else flag
+
+
+def _manual_scheduled_rounds(value: Any) -> Any:
+    if _is_empty(value):
+        return ""
+    numeric = pd.to_numeric(pd.Series([value]), errors="coerce").iloc[0]
+    if pd.isna(numeric):
+        return value
+    return int(numeric)
+
+
+def _manual_winner(row: pd.Series | dict[str, Any]) -> str:
+    winner = _clean(row.get("winner"))
+    lower = winner.lower()
+    if lower in {"fighter_a", "a", "red", "r"}:
+        return _clean(row.get("fighter_a"))
+    if lower in {"fighter_b", "b", "blue", "b_fighter"}:
+        return _clean(row.get("fighter_b"))
+    return winner
 
 
 class UFCStatsAdapter:
@@ -539,6 +606,205 @@ class ManualCsvAdapter:
             "parse_reason": "Parsed manual source rows." if fights else "No manual rows could be mapped to fight schema.",
         }
         return fights, stats, fighters, scorecards, enrichment, odds, diagnostics
+
+
+def create_card_update_template(
+    event_name: str = "",
+    event_date: str = "",
+    output_path: str | Path | None = None,
+) -> tuple[pd.DataFrame, Path]:
+    output = Path(output_path) if output_path else settings.raw_data_dir / "staging" / "manual_completed_card.csv"
+    row = {column: "" for column in MANUAL_CARD_COLUMNS}
+    row["event_name"] = event_name
+    row["event_date"] = _date_key(event_date) or event_date
+    frame = pd.DataFrame([row], columns=MANUAL_CARD_COLUMNS)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    frame.to_csv(output, index=False)
+    return frame, output
+
+
+def _manual_card_rows(
+    frame: pd.DataFrame,
+    source_file: str,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+    fights: list[dict[str, Any]] = []
+    stats: list[dict[str, Any]] = []
+    fighters: dict[str, dict[str, Any]] = {}
+    enrichment: list[dict[str, Any]] = []
+    odds: list[dict[str, Any]] = []
+    if frame.empty:
+        return fights, stats, list(fighters.values()), enrichment, odds
+
+    for index, row in frame.iterrows():
+        fighter_a = _clean(row.get("fighter_a"))
+        fighter_b = _clean(row.get("fighter_b"))
+        if not fighter_a and not fighter_b:
+            continue
+        fight_id = f"manual_card_{index}"
+        event = _clean(row.get("event_name"))
+        fight_date = _date_key(row.get("event_date"))
+        scheduled_rounds = _manual_scheduled_rounds(row.get("scheduled_rounds"))
+        main_event = _manual_flag(row.get("main_event"), default=0)
+        title_fight = _manual_flag(row.get("title_fight"), default=0)
+        weight_class = _clean(row.get("weight_class")) or "Unknown"
+        fight = {
+            "fight_id": fight_id,
+            "event_name": event,
+            "fight_date": fight_date,
+            "event_location": "",
+            "fighter_a": fighter_a,
+            "fighter_b": fighter_b,
+            "winner": _manual_winner(row),
+            "weight_class": weight_class,
+            "method": _clean(row.get("method")),
+            "finish_round": row.get("round"),
+            "finish_time": row.get("time"),
+            "scheduled_rounds": scheduled_rounds,
+            "main_event": main_event,
+            "source_url": source_file,
+            "title_fight": title_fight,
+        }
+        fights.append(fight)
+        enrichment.append(
+            {
+                "fight_date": fight_date,
+                "event": event,
+                "fighter_a": fighter_a,
+                "fighter_b": fighter_b,
+                "weight_class": weight_class,
+                "event_location": "",
+                "main_event": main_event,
+                "title_fight": title_fight,
+                "scheduled_rounds": scheduled_rounds,
+            }
+        )
+        for fighter in [fighter_a, fighter_b]:
+            if fighter:
+                fighters.setdefault(
+                    _normal(fighter),
+                    {
+                        "name": fighter,
+                        "stance": "",
+                        "height_in": "",
+                        "weight_lb": "",
+                        "reach_in": "",
+                        "date_of_birth": "",
+                        "record": "",
+                        "source_url": source_file,
+                    },
+                )
+
+        stat_specs = [
+            (
+                fighter_a,
+                fighter_b,
+                "fighter_a",
+                {
+                    "knockdowns": row.get("fighter_a_kd"),
+                    "sig_str_landed": row.get("fighter_a_sig_str_landed"),
+                    "sig_str_attempted": row.get("fighter_a_sig_str_attempted"),
+                    "total_str_landed": row.get("fighter_a_total_str_landed"),
+                    "total_str_attempted": row.get("fighter_a_total_str_attempted"),
+                    "takedowns_landed": row.get("fighter_a_td_landed"),
+                    "takedowns_attempted": row.get("fighter_a_td_attempted"),
+                    "submission_attempts": row.get("fighter_a_sub_attempts"),
+                    "control_seconds": _manual_control_seconds(row.get("fighter_a_control_time")),
+                },
+            ),
+            (
+                fighter_b,
+                fighter_a,
+                "fighter_b",
+                {
+                    "knockdowns": row.get("fighter_b_kd"),
+                    "sig_str_landed": row.get("fighter_b_sig_str_landed"),
+                    "sig_str_attempted": row.get("fighter_b_sig_str_attempted"),
+                    "total_str_landed": row.get("fighter_b_total_str_landed"),
+                    "total_str_attempted": row.get("fighter_b_total_str_attempted"),
+                    "takedowns_landed": row.get("fighter_b_td_landed"),
+                    "takedowns_attempted": row.get("fighter_b_td_attempted"),
+                    "submission_attempts": row.get("fighter_b_sub_attempts"),
+                    "control_seconds": _manual_control_seconds(row.get("fighter_b_control_time")),
+                },
+            ),
+        ]
+        for fighter, opponent, _, stat_values in stat_specs:
+            if not fighter:
+                continue
+            if any(not _is_empty(value) for value in stat_values.values()):
+                stats.append(
+                    {
+                        "fight_id": fight_id,
+                        "source_url": source_file,
+                        "fighter": fighter,
+                        "opponent": opponent,
+                        **stat_values,
+                    }
+                )
+
+        fighter_a_odds = row.get("fighter_a_odds")
+        fighter_b_odds = row.get("fighter_b_odds")
+        if not _is_empty(fighter_a_odds) or not _is_empty(fighter_b_odds):
+            odds.append(
+                {
+                    "fight_date": fight_date,
+                    "event": event,
+                    "fighter_a": fighter_a,
+                    "fighter_b": fighter_b,
+                    "sportsbook": "manual_card_csv",
+                    "fighter_a_odds": fighter_a_odds,
+                    "fighter_b_odds": fighter_b_odds,
+                    "timestamp": "",
+                    "source_file": source_file,
+                }
+            )
+    return fights, stats, list(fighters.values()), enrichment, odds
+
+
+def import_card_csv(
+    file: str | Path,
+    staging_dir: str | Path | None = None,
+) -> CardUpdateReport:
+    source = Path(file)
+    inspect_csv(source, required_columns=MANUAL_CARD_COLUMNS, require_rows=False, label="manual completed-card CSV")
+    frame = pd.read_csv(source)
+    fights, stats, fighters, enrichment, odds = _manual_card_rows(frame, str(source))
+    staging = Path(staging_dir) if staging_dir else settings.raw_data_dir / "staging"
+    diagnostics = {
+        "source_attempted": "manual_csv",
+        "url_requested": str(source),
+        "rows_read": int(len(frame)),
+        "parsed_fights": int(len(fights)),
+        "parsed_fight_stats": int(len(stats)),
+        "parsed_fighters": int(len(fighters)),
+        "parsed_odds": int(len(odds)),
+        "parse_reason": "Parsed manual completed-card CSV." if fights else "Manual completed-card CSV has headers but no filled fight rows.",
+    }
+    warnings = [] if fights else ["Manual completed-card CSV has no filled fight rows. Fill fighter_a and fighter_b before validation."]
+    report = CardUpdateReport(
+        event_url=str(source),
+        source="manual_csv",
+        staging_dir=staging,
+        status="staged",
+        warnings=warnings,
+        diagnostics=diagnostics,
+    )
+    payloads = {
+        "new_fights.csv": fights,
+        "new_fight_stats.csv": stats,
+        "new_scorecards.csv": [],
+        "new_fighters.csv": fighters,
+        "new_event_enrichment.csv": enrichment,
+        "new_odds.csv": odds,
+    }
+    for filename, rows in payloads.items():
+        path = _write_staging_frame(staging, filename, rows)
+        report.files[filename] = path
+        report.rows_written[filename] = int(len(rows))
+    report_path = staging / "update_report.json"
+    report.files["update_report.json"] = report_path
+    report_path.write_text(json.dumps(report.as_dict(), indent=2, default=str), encoding="utf-8")
+    return report
 
 
 class OddsApiAdapter:
@@ -812,12 +1078,22 @@ def update_after_card(
     else:
         raise InputDataError("--source must be one of: ufcstats, espn, manual, auto.")
 
+    status = "staged"
+    if diagnostics.get("browser_challenge_detected"):
+        status = "blocked_by_browser_challenge"
+        warnings.append(
+            "UFCStats returned a browser/JavaScript challenge. Use `ufc-predict create-card-update-template` "
+            "and `ufc-predict import-card-csv` for a safe manual update."
+        )
+    elif not fights:
+        status = "parsed_zero_fights"
     if not fights:
         warnings.append(diagnostics.get("parse_reason", "Parsing produced zero fights."))
     report = CardUpdateReport(
         event_url=event_url,
         source=normalized_source,
         staging_dir=staging,
+        status=status,
         warnings=warnings,
         diagnostics=diagnostics,
     )
@@ -868,6 +1144,7 @@ def validate_card_update(
     scorecards = _read_frame(staging / "new_scorecards.csv", STAGING_COLUMNS["new_scorecards.csv"])
     fighters = _read_frame(staging / "new_fighters.csv", STAGING_COLUMNS["new_fighters.csv"])
     enrichment = _read_frame(staging / "new_event_enrichment.csv", STAGING_COLUMNS["new_event_enrichment.csv"])
+    odds = _read_frame(staging / "new_odds.csv", STAGING_COLUMNS["new_odds.csv"])
     counts.update(
         {
             "new_fights": int(len(fights)),
@@ -875,10 +1152,11 @@ def validate_card_update(
             "new_scorecards": int(len(scorecards)),
             "new_fighters": int(len(fighters)),
             "new_event_enrichment": int(len(enrichment)),
+            "new_odds": int(len(odds)),
         }
     )
     if fights.empty:
-        errors.append("No staged fights found. Run update-after-card before validation.")
+        errors.append("No staged fights found. Run update-after-card, or fill the manual template and run import-card-csv before validation.")
     required = ["fighter_a", "fighter_b", "fight_date", "winner"]
     for column in required:
         if column not in fights.columns:
@@ -912,6 +1190,22 @@ def validate_card_update(
         if winner.lower() not in allowed_non_decisive and winner not in {_clean(row.get("fighter_a")), _clean(row.get("fighter_b"))}:
             if not ("draw" in method or "no contest" in method or method == "nc"):
                 errors.append(f"Winner is not one of the two fighters: {winner} ({row.get('fighter_a')} vs {row.get('fighter_b')}).")
+        if _is_empty(row.get("method")):
+            errors.append(f"Missing method for staged fight: {row.get('fighter_a')} vs {row.get('fighter_b')}.")
+        round_value = row.get("finish_round")
+        if _is_empty(round_value):
+            errors.append(f"Missing round for staged fight: {row.get('fighter_a')} vs {row.get('fighter_b')}.")
+        else:
+            parsed_round = pd.to_numeric(pd.Series([round_value]), errors="coerce").iloc[0]
+            if pd.isna(parsed_round) or int(parsed_round) != float(parsed_round) or int(parsed_round) < 1 or int(parsed_round) > 5:
+                errors.append(f"Invalid round for staged fight: {row.get('fighter_a')} vs {row.get('fighter_b')} ({round_value}).")
+        time_value = row.get("finish_time")
+        if _is_empty(time_value):
+            errors.append(f"Missing time for staged fight: {row.get('fighter_a')} vs {row.get('fighter_b')}.")
+        else:
+            parsed_seconds = _parse_seconds(time_value)
+            if parsed_seconds is None or parsed_seconds < 0 or parsed_seconds > 300:
+                errors.append(f"Invalid time for staged fight: {row.get('fighter_a')} vs {row.get('fighter_b')} ({time_value}).")
     if duplicate_staged:
         errors.append(f"Staging contains {duplicate_staged} duplicate event/date/fighter pairs.")
     if "fight_id" in fights.columns:
@@ -919,6 +1213,12 @@ def validate_card_update(
         duplicate_ids = int(non_empty_ids[non_empty_ids.ne("")].duplicated().sum())
         if duplicate_ids:
             errors.append(f"Staging contains {duplicate_ids} duplicate fight_id values.")
+    if "scheduled_rounds" in fights.columns:
+        present = ~fights["scheduled_rounds"].map(_is_empty)
+        scheduled = pd.to_numeric(fights.loc[present, "scheduled_rounds"], errors="coerce")
+        invalid = scheduled.isna() | ~scheduled.isin([3, 5])
+        if invalid.any():
+            errors.append(f"new_fights.csv has {int(invalid.sum())} invalid scheduled_rounds values; use 3 or 5 when known.")
     existing = _existing_imports(imports)
     existing_fights = existing["fights"]
     if not existing_fights.empty:
@@ -950,6 +1250,25 @@ def validate_card_update(
             invalid = pd.to_numeric(values[mask], errors="coerce").isna()
             if invalid.any():
                 errors.append(f"new_fight_stats.csv has {int(invalid.sum())} non-numeric values in {column}.")
+    if stats.empty:
+        warnings.append("No staged fight stats were found; the card can still be merged but feature coverage will be lower.")
+    else:
+        optional_stat_columns = [
+            "knockdowns",
+            "sig_str_landed",
+            "sig_str_attempted",
+            "total_str_landed",
+            "total_str_attempted",
+            "takedowns_landed",
+            "takedowns_attempted",
+            "submission_attempts",
+            "control_seconds",
+        ]
+        for column in optional_stat_columns:
+            if column in stats.columns:
+                missing_count = int(stats[column].map(_is_empty).sum())
+                if missing_count:
+                    warnings.append(f"new_fight_stats.csv has {missing_count} blank optional values in {column}.")
     if not scorecards.empty and not fights.empty:
         fight_methods = {fight_identity(row): _clean(row.get("method")).lower() for _, row in fights.iterrows()}
         for _, row in scorecards.iterrows():
@@ -971,12 +1290,21 @@ def validate_card_update(
         for column in ["reach_in", "height_in", "stance", "date_of_birth"]:
             if column in fighters.columns and _is_empty(row.get(column)):
                 warnings.append(f"Missing fighter profile field for {name or 'unknown fighter'}: {column}")
-    if (staging / "new_odds.csv").exists():
-        odds = _read_frame(staging / "new_odds.csv", STAGING_COLUMNS["new_odds.csv"])
-        if odds.empty:
-            warnings.append("No staged odds were found for this card.")
+    if odds.empty:
+        warnings.append("No staged odds were found for this card.")
     else:
-        warnings.append("No staged odds file was found.")
+        from ufc_predictor.odds import is_valid_american_odds
+
+        for index, row in odds.iterrows():
+            left = row.get("fighter_a_odds")
+            right = row.get("fighter_b_odds")
+            has_left = not _is_empty(left)
+            has_right = not _is_empty(right)
+            if has_left != has_right:
+                errors.append(f"new_odds.csv row {index + 2} must include both fighter_a_odds and fighter_b_odds.")
+                continue
+            if has_left and (not is_valid_american_odds(left) or not is_valid_american_odds(right)):
+                errors.append(f"new_odds.csv row {index + 2} has invalid American odds.")
     if scorecards.empty:
         warnings.append("No staged scorecards were found.")
     report = ValidationReport(ok=not errors, staging_dir=staging, errors=errors, warnings=warnings, counts=counts)

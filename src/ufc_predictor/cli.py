@@ -656,6 +656,44 @@ def load_scorecards(
     _print(f"Imported {len(frame)} scorecard rows.")
 
 
+@app.command("create-card-update-template")
+def create_card_update_template(
+    event_name: str = typer.Option(..., "--event-name", help="Completed card/event name."),
+    event_date: str = typer.Option(..., "--event-date", help="Completed card date in YYYY-MM-DD format."),
+    output: Path = typer.Option(
+        settings.raw_data_dir / "staging" / "manual_completed_card.csv",
+        "--output",
+        help="Manual completed-card CSV template output path.",
+    ),
+) -> None:
+    from ufc_predictor.card_update import create_card_update_template as run_create_card_update_template
+
+    frame, path = run_create_card_update_template(event_name=event_name, event_date=event_date, output_path=output)
+    _print(f"Wrote manual completed-card template to {path}")
+    _print(f"Columns: {', '.join(frame.columns)}")
+    _print("Fill one row per fight, then run `ufc-predict import-card-csv --file data/raw/staging/manual_completed_card.csv`.")
+
+
+@app.command("import-card-csv")
+def import_card_csv(
+    file: Path = typer.Option(..., "--file", help="Filled manual completed-card CSV."),
+    staging_dir: Path = typer.Option(settings.raw_data_dir / "staging", help="Staging output directory."),
+) -> None:
+    from ufc_predictor.card_update import import_card_csv as run_import_card_csv
+
+    try:
+        report = run_import_card_csv(file=file, staging_dir=staging_dir)
+    except InputDataError as exc:
+        _runtime_error(f"Manual card CSV import failed:\n{exc}")
+    _print(f"Imported manual completed-card CSV into staging: {report.staging_dir}")
+    for name, path in report.files.items():
+        rows = report.rows_written.get(name)
+        suffix = f" rows={rows}" if rows is not None else ""
+        _print(f"- {name}: {path}{suffix}")
+    for warning in report.warnings:
+        _print(f"[yellow]Warning: {warning}[/yellow]")
+
+
 @app.command("update-after-card")
 def update_after_card(
     event_url: str = typer.Option("", "--event-url", help="Completed event URL or local CSV/HTML file."),
@@ -680,7 +718,11 @@ def update_after_card(
         )
     except Exception as exc:
         _runtime_error(f"Post-card update failed:\n{type(exc).__name__}: {exc}")
-    _print(f"Staged post-card update from {report.source}.")
+    _print(f"Post-card update status: {report.status}")
+    if report.status == "staged":
+        _print(f"Staged post-card update from {report.source}.")
+    else:
+        _print(f"Post-card update from {report.source} did not stage usable fight rows.")
     _print(f"Staging directory: {report.staging_dir}")
     for name, path in report.files.items():
         rows = report.rows_written.get(name)
@@ -710,6 +752,16 @@ def update_after_card(
                 _print(f"- body_preview: {preview}")
     for warning in report.warnings:
         _print(f"[yellow]Warning: {warning}[/yellow]")
+    if report.status == "blocked_by_browser_challenge":
+        _print("[yellow]UFCStats returned a browser/JavaScript challenge. The scraper will not try to bypass it.[/yellow]")
+        _print("Use the manual completed-card CSV fallback:")
+        _print(
+            'ufc-predict create-card-update-template --event-name "EVENT NAME" '
+            "--event-date YYYY-MM-DD --output data/raw/staging/manual_completed_card.csv"
+        )
+        _print("ufc-predict import-card-csv --file data/raw/staging/manual_completed_card.csv")
+        _print("ufc-predict validate-card-update")
+        raise typer.Exit(1)
 
 
 @app.command("validate-card-update")

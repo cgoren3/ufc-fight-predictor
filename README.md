@@ -369,6 +369,36 @@ ufc-predict update-after-card --event-html data/raw/staging/raw_event_page.html 
 
 If UFCStats returns a browser challenge or changes its HTML, `update_report.json` includes the requested URL, status code, final URL, content length, table markers, detected page title/event name, parse reason, and a short safe preview.
 
+### How to update after a card if UFCStats blocks scraping
+
+If UFCStats returns a browser or JavaScript challenge, the scraper records `status: blocked_by_browser_challenge` in `data/raw/staging/update_report.json`, exits gracefully, and does not try to bypass the protection. Use the manual completed-card CSV fallback instead:
+
+```bash
+ufc-predict create-card-update-template --event-name "EVENT NAME" --event-date YYYY-MM-DD --output data/raw/staging/manual_completed_card.csv
+```
+
+Fill one row per fight in `data/raw/staging/manual_completed_card.csv`. Expected columns are:
+
+```csv
+event_name,event_date,fighter_a,fighter_b,winner,method,round,time,weight_class,scheduled_rounds,main_event,title_fight,fighter_a_kd,fighter_b_kd,fighter_a_sig_str_landed,fighter_a_sig_str_attempted,fighter_b_sig_str_landed,fighter_b_sig_str_attempted,fighter_a_total_str_landed,fighter_a_total_str_attempted,fighter_b_total_str_landed,fighter_b_total_str_attempted,fighter_a_td_landed,fighter_a_td_attempted,fighter_b_td_landed,fighter_b_td_attempted,fighter_a_sub_attempts,fighter_b_sub_attempts,fighter_a_control_time,fighter_b_control_time,fighter_a_odds,fighter_b_odds
+```
+
+Then stage, validate, merge, and rebuild:
+
+```bash
+ufc-predict import-card-csv --file data/raw/staging/manual_completed_card.csv
+ufc-predict validate-card-update
+ufc-predict apply-card-update
+ufc-predict build-dataset --verbose
+ufc-predict train
+ufc-predict backtest --model-mode market-aware
+ufc-predict compare-model-modes
+ufc-predict leakage-audit --sample-size 100
+ufc-predict report
+```
+
+`import-card-csv` writes only staging files. `validate-card-update` checks required fields, winner validity, future dates, duplicate event/date/fighter pairs, numeric stats, scheduled rounds, method/round/time values, and American odds when provided. `apply-card-update` creates a timestamped backup before merging and skips duplicates.
+
 For a full rebuild after a validated staged update:
 
 ```bash

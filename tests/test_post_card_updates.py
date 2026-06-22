@@ -6,7 +6,14 @@ from pathlib import Path
 import pandas as pd
 from typer.testing import CliRunner
 
-from ufc_predictor.card_update import apply_card_update, prepare_upcoming_card, update_after_card, validate_card_update
+from ufc_predictor.card_update import (
+    apply_card_update,
+    create_card_update_template,
+    import_card_csv,
+    prepare_upcoming_card,
+    update_after_card,
+    validate_card_update,
+)
 from ufc_predictor.cli import _ablation_groups, app
 from ufc_predictor.features.build_fight_dataset import build_fight_dataset
 from ufc_predictor.fighter_profiles import (
@@ -102,6 +109,50 @@ def _card_csv(path: Path, date: str = "2024-02-01") -> Path:
     return output
 
 
+def _manual_completed_card_csv(path: Path, date: str = "2024-02-01", winner: str = "New A") -> Path:
+    frame = pd.DataFrame(
+        [
+            {
+                "event_name": "Manual UFC Test Card",
+                "event_date": date,
+                "fighter_a": "New A",
+                "fighter_b": "New B",
+                "winner": winner,
+                "method": "Decision - Unanimous",
+                "round": 3,
+                "time": "5:00",
+                "weight_class": "Welterweight",
+                "scheduled_rounds": 3,
+                "main_event": 1,
+                "title_fight": 0,
+                "fighter_a_kd": 1,
+                "fighter_b_kd": 0,
+                "fighter_a_sig_str_landed": 42,
+                "fighter_a_sig_str_attempted": 91,
+                "fighter_b_sig_str_landed": 31,
+                "fighter_b_sig_str_attempted": 88,
+                "fighter_a_total_str_landed": 60,
+                "fighter_a_total_str_attempted": 112,
+                "fighter_b_total_str_landed": 45,
+                "fighter_b_total_str_attempted": 105,
+                "fighter_a_td_landed": 2,
+                "fighter_a_td_attempted": 5,
+                "fighter_b_td_landed": 0,
+                "fighter_b_td_attempted": 2,
+                "fighter_a_sub_attempts": 1,
+                "fighter_b_sub_attempts": 0,
+                "fighter_a_control_time": "3:12",
+                "fighter_b_control_time": "0:15",
+                "fighter_a_odds": -150,
+                "fighter_b_odds": 130,
+            }
+        ]
+    )
+    output = path / "manual_completed_card.csv"
+    frame.to_csv(output, index=False)
+    return output
+
+
 def _ufcstats_event_html() -> str:
     return """
     <html>
@@ -154,6 +205,46 @@ def test_update_after_card_writes_staging_files_only(tmp_path: Path) -> None:
     assert len(existing) == 1
 
 
+def test_create_card_update_template(tmp_path: Path) -> None:
+    output = tmp_path / "manual_completed_card.csv"
+
+    frame, path = create_card_update_template("UFC Example", "2025-01-01", output)
+
+    assert path == output
+    assert output.exists()
+    assert list(frame.columns)[0:4] == ["event_name", "event_date", "fighter_a", "fighter_b"]
+    saved = pd.read_csv(output)
+    assert saved.loc[0, "event_name"] == "UFC Example"
+    assert saved.loc[0, "event_date"] == "2025-01-01"
+
+
+def test_import_card_csv_writes_staging_files_and_manual_odds(tmp_path: Path) -> None:
+    staging = tmp_path / "staging"
+    manual = _manual_completed_card_csv(tmp_path)
+
+    report = import_card_csv(manual, staging_dir=staging)
+
+    fights = pd.read_csv(staging / "new_fights.csv")
+    stats = pd.read_csv(staging / "new_fight_stats.csv")
+    odds = pd.read_csv(staging / "new_odds.csv")
+    assert report.rows_written["new_fights.csv"] == 1
+    assert report.rows_written["new_fight_stats.csv"] == 2
+    assert report.rows_written["new_odds.csv"] == 1
+    assert fights.loc[0, "event_name"] == "Manual UFC Test Card"
+    assert len(stats) == 2
+    assert odds.loc[0, "sportsbook"] == "manual_card_csv"
+
+
+def test_import_card_csv_rejects_missing_columns(tmp_path: Path) -> None:
+    bad = tmp_path / "bad_card.csv"
+    pd.DataFrame([{"event_name": "Bad"}]).to_csv(bad, index=False)
+
+    result = runner.invoke(app, ["import-card-csv", "--file", str(bad), "--staging-dir", str(tmp_path / "staging")])
+
+    assert result.exit_code == 1
+    assert "missing required columns" in result.output
+
+
 def test_update_after_card_stages_nonzero_rows_from_ufcstats_fixture_html(tmp_path: Path) -> None:
     html = _write_ufcstats_html(tmp_path)
     staging = tmp_path / "staging"
@@ -184,8 +275,33 @@ def test_zero_parsed_ufcstats_page_has_clear_diagnostics(tmp_path: Path) -> None
     report = update_after_card(str(html), source="ufcstats", event_html=html, staging_dir=tmp_path / "staging")
 
     assert report.rows_written["new_fights.csv"] == 0
+    assert report.status == "blocked_by_browser_challenge"
     assert report.diagnostics["browser_challenge_detected"] is True
     assert "challenge" in report.diagnostics["parse_reason"].lower()
+
+
+def test_browser_challenge_cli_exits_gracefully_and_recommends_manual_csv(tmp_path: Path) -> None:
+    html = tmp_path / "challenge.html"
+    html.write_text("<html><title>Loading...</title><body>Checking your browser... This site requires JavaScript.</body></html>", encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        [
+            "update-after-card",
+            "--event-html",
+            str(html),
+            "--source",
+            "ufcstats",
+            "--staging-dir",
+            str(tmp_path / "staging"),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "blocked_by_browser_challenge" in result.output
+    assert "create-card-update-template" in result.output
+    report = json.loads((tmp_path / "staging" / "update_report.json").read_text(encoding="utf-8"))
+    assert report["status"] == "blocked_by_browser_challenge"
 
 
 def test_raw_html_save_and_load_flow(monkeypatch, tmp_path: Path) -> None:
@@ -223,6 +339,34 @@ def test_validate_card_update_catches_duplicates(tmp_path: Path) -> None:
     assert any("already present" in error for error in report.errors)
 
 
+def test_validate_card_update_catches_bad_manual_winner(tmp_path: Path) -> None:
+    imports = tmp_path / "imports"
+    _write_imports(imports)
+    staging = tmp_path / "staging"
+    import_card_csv(_manual_completed_card_csv(tmp_path, winner="Someone Else"), staging_dir=staging)
+
+    report = validate_card_update(staging_dir=staging, imports_dir=imports)
+
+    assert not report.ok
+    assert any("Winner is not one of the two fighters" in error for error in report.errors)
+
+
+def test_validate_card_update_catches_invalid_manual_odds(tmp_path: Path) -> None:
+    imports = tmp_path / "imports"
+    _write_imports(imports)
+    staging = tmp_path / "staging"
+    manual = _manual_completed_card_csv(tmp_path)
+    frame = pd.read_csv(manual)
+    frame.loc[0, "fighter_a_odds"] = 0
+    frame.to_csv(manual, index=False)
+    import_card_csv(manual, staging_dir=staging)
+
+    report = validate_card_update(staging_dir=staging, imports_dir=imports)
+
+    assert not report.ok
+    assert any("invalid American odds" in error for error in report.errors)
+
+
 def test_existing_event_still_stages_before_validation_catches_duplicate(tmp_path: Path) -> None:
     imports = tmp_path / "imports"
     _write_imports(imports)
@@ -254,6 +398,18 @@ def test_validate_card_update_catches_future_fight_dates(tmp_path: Path) -> None
     assert any("future fight dates" in error for error in report.errors)
 
 
+def test_validate_card_update_catches_future_manual_fight_dates(tmp_path: Path) -> None:
+    imports = tmp_path / "imports"
+    _write_imports(imports)
+    staging = tmp_path / "staging"
+    import_card_csv(_manual_completed_card_csv(tmp_path, "2999-01-01"), staging_dir=staging)
+
+    report = validate_card_update(staging_dir=staging, imports_dir=imports)
+
+    assert not report.ok
+    assert any("future fight dates" in error for error in report.errors)
+
+
 def test_apply_card_update_creates_backup_and_does_not_duplicate(tmp_path: Path) -> None:
     imports = tmp_path / "imports"
     raw = tmp_path / "raw"
@@ -272,6 +428,29 @@ def test_apply_card_update_creates_backup_and_does_not_duplicate(tmp_path: Path)
     duplicate_report = validate_card_update(staging_dir=staging, imports_dir=imports)
     assert not duplicate_report.ok
     assert any("already present" in error for error in duplicate_report.errors)
+
+
+def test_apply_card_update_adds_manual_rows_without_duplication(tmp_path: Path) -> None:
+    imports = tmp_path / "imports"
+    raw = tmp_path / "raw"
+    _write_imports(imports)
+    staging = tmp_path / "staging"
+    import_card_csv(_manual_completed_card_csv(tmp_path), staging_dir=staging)
+    validation = validate_card_update(staging_dir=staging, imports_dir=imports)
+    assert validation.ok
+
+    report = apply_card_update(staging_dir=staging, imports_dir=imports, raw_dir=raw, backup_root=tmp_path / "backups")
+
+    fights = pd.read_csv(imports / "fights.csv")
+    stats = pd.read_csv(imports / "fight_stats.csv")
+    odds = pd.read_csv(imports / "odds.csv")
+    assert report.backup_dir.exists()
+    assert report.rows_added["fights"] == 1
+    assert report.rows_added["fight_stats"] == 2
+    assert report.rows_added["odds"] == 1
+    assert len(fights) == 2
+    assert len(stats) == 2
+    assert len(odds) == 1
 
 
 def test_fighter_profile_enrichment_improves_missing_reach_without_overwriting(tmp_path: Path) -> None:
