@@ -9,7 +9,13 @@ from typer.testing import CliRunner
 from ufc_predictor.card_update import apply_card_update, prepare_upcoming_card, update_after_card, validate_card_update
 from ufc_predictor.cli import _ablation_groups, app
 from ufc_predictor.features.build_fight_dataset import build_fight_dataset
-from ufc_predictor.fighter_profiles import enrich_fighter_profiles
+from ufc_predictor.fighter_profiles import (
+    apply_fighter_profile_enrichment,
+    enrich_fighter_profiles,
+    import_fighter_profile_csv,
+    validate_fighter_profile_enrichment,
+)
+from ufc_predictor.ingest.ufcstats_scraper import UFCStatsScraper
 
 
 runner = CliRunner()
@@ -96,6 +102,42 @@ def _card_csv(path: Path, date: str = "2024-02-01") -> Path:
     return output
 
 
+def _ufcstats_event_html() -> str:
+    return """
+    <html>
+      <head><title>UFCStats - UFC Test</title></head>
+      <body>
+        <span class="b-content__title-highlight">UFC Test: Alpha vs Beta</span>
+        <li class="b-list__box-list-item">Date: February 01, 2024</li>
+        <li class="b-list__box-list-item">Location: Boston, Massachusetts, USA</li>
+        <table class="b-fight-details__table">
+          <tr class="b-fight-details__table-row b-fight-details__table-row__hover" data-link="http://ufcstats.com/fight-details/abc">
+            <td><p>win</p><p>loss</p></td>
+            <td>
+              <p><a href="http://ufcstats.com/fighter-details/a1">Alpha Fighter</a></p>
+              <p><a href="http://ufcstats.com/fighter-details/b1">Beta Fighter</a></p>
+            </td>
+            <td><p>1</p><p>0</p></td>
+            <td><p>12 of 30</p><p>8 of 25</p></td>
+            <td><p>2 of 4</p><p>0 of 1</p></td>
+            <td><p>1</p><p>0</p></td>
+            <td>Lightweight</td>
+            <td>Decision - Unanimous</td>
+            <td>3</td>
+            <td>5:00</td>
+          </tr>
+        </table>
+      </body>
+    </html>
+    """
+
+
+def _write_ufcstats_html(path: Path) -> Path:
+    output = path / "ufcstats_event.html"
+    output.write_text(_ufcstats_event_html(), encoding="utf-8")
+    return output
+
+
 def test_update_after_card_writes_staging_files_only(tmp_path: Path) -> None:
     imports = tmp_path / "imports"
     _write_imports(imports)
@@ -112,6 +154,59 @@ def test_update_after_card_writes_staging_files_only(tmp_path: Path) -> None:
     assert len(existing) == 1
 
 
+def test_update_after_card_stages_nonzero_rows_from_ufcstats_fixture_html(tmp_path: Path) -> None:
+    html = _write_ufcstats_html(tmp_path)
+    staging = tmp_path / "staging"
+
+    report = update_after_card(str(html), source="ufcstats", event_html=html, staging_dir=staging)
+
+    fights = pd.read_csv(staging / "new_fights.csv")
+    stats = pd.read_csv(staging / "new_fight_stats.csv")
+    fighters = pd.read_csv(staging / "new_fighters.csv")
+    assert report.rows_written["new_fights.csv"] == 1
+    assert fights.loc[0, "event_name"] == "UFC Test: Alpha vs Beta"
+    assert fights.loc[0, "fighter_a"] == "Alpha Fighter"
+    assert fights.loc[0, "fighter_b"] == "Beta Fighter"
+    assert fights.loc[0, "winner"] == "Alpha Fighter"
+    assert fights.loc[0, "method"] == "Decision - Unanimous"
+    assert str(fights.loc[0, "finish_round"]) == "3"
+    assert fights.loc[0, "finish_time"] == "5:00"
+    assert fights.loc[0, "weight_class"] == "Lightweight"
+    assert fights.loc[0, "source_url"] == "http://ufcstats.com/fight-details/abc"
+    assert len(stats) == 2
+    assert len(fighters) == 2
+
+
+def test_zero_parsed_ufcstats_page_has_clear_diagnostics(tmp_path: Path) -> None:
+    html = tmp_path / "challenge.html"
+    html.write_text("<html><title>Loading...</title><body>Checking your browser...</body></html>", encoding="utf-8")
+
+    report = update_after_card(str(html), source="ufcstats", event_html=html, staging_dir=tmp_path / "staging")
+
+    assert report.rows_written["new_fights.csv"] == 0
+    assert report.diagnostics["browser_challenge_detected"] is True
+    assert "challenge" in report.diagnostics["parse_reason"].lower()
+
+
+def test_raw_html_save_and_load_flow(monkeypatch, tmp_path: Path) -> None:
+    from ufc_predictor import card_update
+
+    class FakeAdapter(card_update.UFCStatsAdapter):
+        def fetch_event_html(self, event_url: str):
+            html = _ufcstats_event_html()
+            return html, self._diagnostics(event_url, html, 200, event_url, "network")
+
+    monkeypatch.setattr(card_update, "UFCStatsAdapter", FakeAdapter)
+    staging = tmp_path / "staging"
+
+    fetched = update_after_card("http://ufcstats.com/event-details/test", source="ufcstats", staging_dir=staging, save_raw_html=True)
+    loaded = update_after_card(str(staging / "raw_event_page.html"), source="ufcstats", event_html=staging / "raw_event_page.html", staging_dir=tmp_path / "staging2")
+
+    assert fetched.rows_written["new_fights.csv"] == 1
+    assert (staging / "raw_event_page.html").exists()
+    assert loaded.rows_written["new_fights.csv"] == 1
+
+
 def test_validate_card_update_catches_duplicates(tmp_path: Path) -> None:
     imports = tmp_path / "imports"
     _write_imports(imports)
@@ -126,6 +221,25 @@ def test_validate_card_update_catches_duplicates(tmp_path: Path) -> None:
 
     assert not report.ok
     assert any("already present" in error for error in report.errors)
+
+
+def test_existing_event_still_stages_before_validation_catches_duplicate(tmp_path: Path) -> None:
+    imports = tmp_path / "imports"
+    _write_imports(imports)
+    html = _write_ufcstats_html(tmp_path)
+    staging = tmp_path / "staging"
+    update_after_card(str(html), source="ufcstats", event_html=html, staging_dir=staging)
+    fights = pd.read_csv(staging / "new_fights.csv")
+    fights.loc[0, "fight_date"] = "2024-01-01"
+    fights.loc[0, "fighter_a"] = "Old A"
+    fights.loc[0, "fighter_b"] = "Old B"
+    fights.to_csv(staging / "new_fights.csv", index=False)
+
+    validation = validate_card_update(staging_dir=staging, imports_dir=imports)
+
+    assert len(pd.read_csv(staging / "new_fights.csv")) == 1
+    assert not validation.ok
+    assert any("already present" in error for error in validation.errors)
 
 
 def test_validate_card_update_catches_future_fight_dates(tmp_path: Path) -> None:
@@ -172,19 +286,121 @@ def test_fighter_profile_enrichment_improves_missing_reach_without_overwriting(t
         ]
     ).to_csv(sources / "fighters.csv", index=False)
 
-    report = enrich_fighter_profiles(
+    proposal = enrich_fighter_profiles(
         source="local",
         fighters_path=imports / "fighters.csv",
         source_dir=sources,
         output_path=imports / "fighter_profile_enrichment.csv",
         report_path=tmp_path / "profile_report.json",
-        apply=True,
+    )
+    validation = validate_fighter_profile_enrichment(
+        fighters_path=imports / "fighters.csv",
+        enrichment_path=imports / "fighter_profile_enrichment.csv",
+        report_path=tmp_path / "validation.json",
+    )
+    report = apply_fighter_profile_enrichment(
+        fighters_path=imports / "fighters.csv",
+        enrichment_path=imports / "fighter_profile_enrichment.csv",
+        backup_root=tmp_path / "backups",
     )
 
     fighters = pd.read_csv(imports / "fighters.csv")
+    assert proposal.coverage["enrichment_rows_with_reach"] == 2
+    assert validation.matched_fighters == 2
     assert report.fields_updated["reach_in"] == 1
+    assert report.backup_dir.exists()
     assert fighters.loc[fighters["name"] == "Old A", "reach_in"].iloc[0] == 72
     assert fighters.loc[fighters["name"] == "Old B", "reach_in"].iloc[0] == 71
+
+
+def test_fighter_profile_enrichment_does_not_overwrite_unless_requested(tmp_path: Path) -> None:
+    imports = tmp_path / "imports"
+    sources = tmp_path / "sources"
+    _write_imports(imports)
+    sources.mkdir()
+    pd.DataFrame([{"Full Name": "Old A", "Reach": 99, "Ht.": 6.00, "Stance": "Southpaw"}]).to_csv(sources / "fighters.csv", index=False)
+    enrich_fighter_profiles(source="local", fighters_path=imports / "fighters.csv", source_dir=sources, output_path=imports / "fighter_profile_enrichment.csv")
+
+    apply_fighter_profile_enrichment(fighters_path=imports / "fighters.csv", enrichment_path=imports / "fighter_profile_enrichment.csv", backup_root=tmp_path / "backups")
+    fighters = pd.read_csv(imports / "fighters.csv")
+    assert fighters.loc[fighters["name"] == "Old A", "reach_in"].iloc[0] == 72
+
+    apply_fighter_profile_enrichment(
+        fighters_path=imports / "fighters.csv",
+        enrichment_path=imports / "fighter_profile_enrichment.csv",
+        backup_root=tmp_path / "backups2",
+        overwrite=True,
+    )
+    fighters = pd.read_csv(imports / "fighters.csv")
+    assert fighters.loc[fighters["name"] == "Old A", "reach_in"].iloc[0] == 99
+
+
+def test_normalized_name_matching_for_profile_enrichment(tmp_path: Path) -> None:
+    imports = tmp_path / "imports"
+    sources = tmp_path / "sources"
+    _write_imports(imports)
+    fighters = pd.read_csv(imports / "fighters.csv")
+    fighters.loc[fighters["name"] == "Old B", "name"] = "Jose Aldo Jr."
+    fighters.to_csv(imports / "fighters.csv", index=False)
+    sources.mkdir()
+    pd.DataFrame([{"Full Name": "José Aldo", "Reach": 70, "Ht.": 5.70, "Stance": "Orthodox"}]).to_csv(sources / "fighters.csv", index=False)
+
+    enrich_fighter_profiles(source="local", fighters_path=imports / "fighters.csv", source_dir=sources, output_path=imports / "fighter_profile_enrichment.csv")
+    report = apply_fighter_profile_enrichment(fighters_path=imports / "fighters.csv", enrichment_path=imports / "fighter_profile_enrichment.csv", backup_root=tmp_path / "backups")
+
+    fighters = pd.read_csv(imports / "fighters.csv")
+    assert report.fields_updated["reach_in"] == 1
+    assert fighters.loc[fighters["name"] == "Jose Aldo Jr.", "reach_in"].iloc[0] == 70
+
+
+def test_manual_fighter_profile_csv_import(tmp_path: Path) -> None:
+    imports = tmp_path / "imports"
+    _write_imports(imports)
+    manual = tmp_path / "manual_fighter_profiles.csv"
+    pd.DataFrame(
+        [
+            {
+                "fighter_name": "Old B",
+                "height": "5'9",
+                "weight": 155,
+                "reach": 71,
+                "stance": "Switch",
+                "dob": "1991-02-03",
+                "weight_class": "Lightweight",
+                "source": "manual",
+            }
+        ]
+    ).to_csv(manual, index=False)
+
+    frame, path = import_fighter_profile_csv(manual, output_path=imports / "fighter_profile_enrichment.csv", append=False)
+    report = apply_fighter_profile_enrichment(fighters_path=imports / "fighters.csv", enrichment_path=path, backup_root=tmp_path / "backups")
+
+    assert len(frame) == 1
+    assert report.fields_updated["reach_in"] == 1
+
+
+def test_ufcstats_fighter_page_parser_fixture(monkeypatch) -> None:
+    html = """
+    <html><body>
+      <span class="b-content__title-highlight">Fixture Fighter</span>
+      <span class="b-content__title-record">Record: 10-1-0</span>
+      <li class="b-list__box-list-item">Height: 5' 11"</li>
+      <li class="b-list__box-list-item">Weight: 155 lbs.</li>
+      <li class="b-list__box-list-item">Reach: 72"</li>
+      <li class="b-list__box-list-item">STANCE: Southpaw</li>
+      <li class="b-list__box-list-item">DOB: Jan 01, 1990</li>
+    </body></html>
+    """
+    scraper = UFCStatsScraper()
+    monkeypatch.setattr(scraper, "fetch", lambda url: html)
+
+    profile = scraper.scrape_fighter("http://ufcstats.com/fighter-details/test")
+
+    assert profile["name"] == "Fixture Fighter"
+    assert profile["height_in"] == "5' 11"
+    assert profile["weight_lb"] == "155"
+    assert profile["reach_in"] == "72"
+    assert profile["stance"] == "Southpaw"
 
 
 def test_reach_feature_creation_and_missing_indicators() -> None:

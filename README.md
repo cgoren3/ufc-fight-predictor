@@ -332,6 +332,12 @@ The report includes data-quality coverage percentages for known `weight_class`, 
 
 ## Post-Card Updates
 
+The update system is adapter-based. No single website is treated as the only source of truth:
+
+- `UFCStatsAdapter`: free event results, fight stats, fighter profile pages, height, weight, reach, stance, and DOB when UFCStats pages are reachable or supplied as saved HTML.
+- `ManualCsvAdapter`: local/manual fight results, upcoming-card templates, odds, and fighter profile corrections.
+- `OddsApiAdapter`, `BestFightOddsAdapter`, and `SportsDataIOAdapter`: optional future/paid odds or data sources. They should only activate when credentials are configured and must not be required for the local/free workflow. Never commit API keys.
+
 After a completed UFC card, stage the new data first. Staging is intentional: the scraper/parser should not blindly overwrite your historical imports.
 
 ```bash
@@ -354,6 +360,15 @@ ufc-predict apply-card-update
 
 `apply-card-update` merges validated staging data into `data/raw/imports/`, creates a timestamped backup under `data/raw/backups/YYYY-MM-DD_HHMMSS/`, skips duplicate fights, and only fills missing fighter profile fields with non-empty new values. Existing manually corrected values are preserved.
 
+To debug UFCStats without repeatedly hitting the site:
+
+```bash
+ufc-predict update-after-card --event-url "EVENT_URL" --source ufcstats --save-raw-html
+ufc-predict update-after-card --event-html data/raw/staging/raw_event_page.html --source ufcstats
+```
+
+If UFCStats returns a browser challenge or changes its HTML, `update_report.json` includes the requested URL, status code, final URL, content length, table markers, detected page title/event name, parse reason, and a short safe preview.
+
 For a full rebuild after a validated staged update:
 
 ```bash
@@ -370,12 +385,16 @@ Reach, height, stance, DOB, nickname, and weight-class coverage can be improved 
 
 ```bash
 ufc-predict enrich-fighter-profiles --source auto
+ufc-predict validate-fighter-profile-enrichment
+ufc-predict apply-fighter-profile-enrichment
 ```
 
 The command writes:
 
 - `data/raw/imports/fighter_profile_enrichment.csv`
 - `data/raw/staging/fighter_profile_enrichment_report.json`
+
+`enrich-fighter-profiles` writes candidate enrichment rows and a coverage report. `validate-fighter-profile-enrichment` reports proposed missing-field updates. `apply-fighter-profile-enrichment` creates a backup and applies only safe missing-field updates. Non-empty trusted values are preserved unless `--overwrite` is explicitly passed.
 
 It prefers existing local data, then external CSVs under `data/raw/enrichment_sources/`, then UFCStats profile pages only when a fighter has a usable UFCStats profile URL. Requests use the project scraper cache, retries, and rate limiting. It does not bypass anti-bot protection.
 
@@ -385,6 +404,20 @@ Manual fallback files can be placed under `data/raw/imports/` as `fighter_profil
 name,nickname,height_in,weight_lb,reach_in,stance,date_of_birth,weight_class,source_url
 ```
 
+Or import a staging/manual file:
+
+```bash
+ufc-predict import-fighter-profile-csv --file data/raw/staging/manual_fighter_profiles.csv
+ufc-predict validate-fighter-profile-enrichment
+ufc-predict apply-fighter-profile-enrichment
+```
+
+Manual CSV schema:
+
+```csv
+fighter_name,height,weight,reach,stance,dob,weight_class,source
+```
+
 Existing non-empty fields in `fighters.csv` are not overwritten.
 
 ## Upcoming Cards
@@ -392,7 +425,7 @@ Existing non-empty fields in `fighters.csv` are not overwritten.
 Create a prediction template for an upcoming card:
 
 ```bash
-ufc-predict prepare-upcoming-card --event-url "EVENT_URL"
+ufc-predict prepare-upcoming-card --event-url "EVENT_URL" --source auto
 ```
 
 This writes `data/raw/staging/upcoming_card_predictions.csv` with:
@@ -411,9 +444,26 @@ Manual odds are used only for that prediction run unless you explicitly import o
 
 ## Local Artifacts
 
-Generated models, processed datasets, staging files, backups, reports, and scraper caches are local artifacts. They should normally be regenerated rather than committed:
+Generated models, processed datasets, staging files, backups, reports, scraper caches, and imported API/manual secrets are local artifacts. They should normally be regenerated rather than committed:
 
 ```bash
+ufc-predict build-dataset --verbose
+ufc-predict train
+ufc-predict backtest --model-mode market-aware
+ufc-predict compare-model-modes
+ufc-predict leakage-audit --sample-size 100
+ufc-predict report
+```
+
+Recommended post-card workflow:
+
+```bash
+ufc-predict update-after-card --event-url "EVENT_URL" --source auto
+ufc-predict validate-card-update
+ufc-predict apply-card-update
+ufc-predict enrich-fighter-profiles --source auto
+ufc-predict validate-fighter-profile-enrichment
+ufc-predict apply-fighter-profile-enrichment
 ufc-predict build-dataset --verbose
 ufc-predict train
 ufc-predict backtest --model-mode market-aware

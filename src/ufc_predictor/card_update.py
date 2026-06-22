@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -78,6 +79,7 @@ class CardUpdateReport:
     files: dict[str, Path] = field(default_factory=dict)
     rows_written: dict[str, int] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
+    diagnostics: dict[str, Any] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -87,6 +89,7 @@ class CardUpdateReport:
             "files": {name: str(path) for name, path in self.files.items()},
             "rows_written": self.rows_written,
             "warnings": self.warnings,
+            "diagnostics": self.diagnostics,
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
 
@@ -133,6 +136,11 @@ def _clean(value: Any) -> str:
     if value is None or pd.isna(value):
         return ""
     return " ".join(str(value).strip().split())
+
+
+def _safe_preview(value: str, limit: int = 300) -> str:
+    text = re.sub(r"\s+", " ", value or "").strip()
+    return text[:limit]
 
 
 def _normal(value: Any) -> str:
@@ -220,6 +228,341 @@ def _write_staging_frame(staging_dir: Path, filename: str, rows: list[dict[str, 
     path = staging_dir / filename
     frame.to_csv(path, index=False)
     return path
+
+
+def _soup_from_html(html: str) -> Any:
+    try:
+        from bs4 import BeautifulSoup
+    except Exception as exc:  # pragma: no cover - dependency guard
+        raise RuntimeError("beautifulsoup4 is required for UFCStats parsing.") from exc
+    return BeautifulSoup(html, "html.parser")
+
+
+def _cell_values(cell: Any) -> list[str]:
+    values = [_clean(item.get_text(" ", strip=True)) for item in cell.select("p")]
+    values = [value for value in values if value]
+    if len(values) >= 2:
+        return values[:2]
+    anchors = [_clean(item.get_text(" ", strip=True)) for item in cell.select("a")]
+    anchors = [value for value in anchors if value]
+    if len(anchors) >= 2:
+        return anchors[:2]
+    text = _clean(cell.get_text(" ", strip=True))
+    if not text:
+        return ["", ""]
+    return [text, ""]
+
+
+def _parse_landed_attempted(value: Any) -> tuple[float | None, float | None]:
+    text = _clean(value).lower()
+    if not text:
+        return None, None
+    match = re.search(r"(-?\d+(?:\.\d+)?)\s*(?:of|/|-)\s*(-?\d+(?:\.\d+)?)", text)
+    if match:
+        return float(match.group(1)), float(match.group(2))
+    numeric = pd.to_numeric(pd.Series([text]), errors="coerce").iloc[0]
+    if pd.isna(numeric):
+        return None, None
+    return float(numeric), None
+
+
+def _parse_numeric(value: Any) -> float | None:
+    numeric = pd.to_numeric(pd.Series([value]), errors="coerce").iloc[0]
+    if pd.isna(numeric):
+        return None
+    return float(numeric)
+
+
+def _parse_seconds(value: Any) -> float | None:
+    text = _clean(value)
+    if not text:
+        return None
+    if ":" in text:
+        left, right = text.split(":", 1)
+        try:
+            return float(left) * 60.0 + float(right)
+        except ValueError:
+            return None
+    return _parse_numeric(text)
+
+
+class UFCStatsAdapter:
+    """Source adapter for UFCStats event, fight-stat, and profile pages."""
+
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+        ),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Connection": "keep-alive",
+    }
+
+    def fetch_event_html(self, event_url: str) -> tuple[str, dict[str, Any]]:
+        path_text = event_url.replace("file://", "")
+        path = Path(path_text)
+        if path.exists():
+            html = path.read_text(encoding="utf-8")
+            return html, self._diagnostics(event_url, html, status_code=None, final_url=str(path), source="local_file")
+        try:
+            import requests
+        except Exception as exc:  # pragma: no cover - dependency guard
+            raise RuntimeError("requests is required for UFCStats fetching.") from exc
+        diagnostics: dict[str, Any] = {"source_attempted": "ufcstats", "url_requested": event_url}
+        try:
+            response = requests.get(
+                event_url,
+                headers=self.headers,
+                timeout=settings.request_timeout_seconds,
+                allow_redirects=True,
+            )
+            html = response.text or ""
+            diagnostics.update(
+                self._diagnostics(
+                    event_url,
+                    html,
+                    status_code=response.status_code,
+                    final_url=response.url,
+                    source="network",
+                )
+            )
+            diagnostics["exception_type"] = None
+            diagnostics["exception_message"] = None
+            if response.status_code >= 400:
+                diagnostics["parse_reason"] = f"HTTP {response.status_code} response."
+            return html, diagnostics
+        except Exception as exc:
+            diagnostics.update(
+                {
+                    "http_status_code": None,
+                    "final_url": "",
+                    "response_content_length": 0,
+                    "exception_type": type(exc).__name__,
+                    "exception_message": str(exc),
+                    "ufcstats_table_marker_found": False,
+                    "fight_row_marker_found": False,
+                    "page_title": "",
+                    "event_name_detected": "",
+                    "parse_reason": "Network fetch failed.",
+                    "body_preview": "",
+                }
+            )
+            return "", diagnostics
+
+    def _diagnostics(
+        self,
+        requested_url: str,
+        html: str,
+        status_code: int | None,
+        final_url: str,
+        source: str,
+    ) -> dict[str, Any]:
+        soup = _soup_from_html(html) if html else None
+        title = _clean(soup.title.get_text(" ", strip=True)) if soup is not None and soup.title is not None else ""
+        event_name = ""
+        if soup is not None:
+            event_node = soup.select_one(".b-content__title-highlight")
+            event_name = _clean(event_node.get_text(" ", strip=True)) if event_node is not None else ""
+        challenge = "Checking your browser" in html or "requires JavaScript" in html
+        return {
+            "source_attempted": "ufcstats",
+            "fetch_source": source,
+            "url_requested": requested_url,
+            "http_status_code": status_code,
+            "final_url": final_url,
+            "response_content_length": len(html or ""),
+            "ufcstats_table_marker_found": "b-fight-details__table" in html,
+            "fight_row_marker_found": "b-fight-details__table-row" in html or "data-link" in html,
+            "browser_challenge_detected": challenge,
+            "page_title": title,
+            "event_name_detected": event_name,
+            "body_preview": _safe_preview(soup.get_text(" ", strip=True) if soup is not None else html),
+        }
+
+    def parse_event_html(
+        self,
+        html: str,
+        event_url: str,
+        diagnostics: dict[str, Any] | None = None,
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[str], dict[str, Any]]:
+        diagnostics = dict(diagnostics or self._diagnostics(event_url, html, None, event_url, "html"))
+        warnings: list[str] = []
+        if not html.strip():
+            diagnostics["parse_reason"] = "Empty HTML response."
+            return [], [], [], [], warnings, diagnostics
+        soup = _soup_from_html(html)
+        event_node = soup.select_one(".b-content__title-highlight")
+        event_name = diagnostics.get("event_name_detected") or (_clean(event_node.get_text(" ", strip=True)) if event_node is not None else "")
+        details = [_clean(item.get_text(" ", strip=True)) for item in soup.select(".b-list__box-list-item")]
+        fight_date = ""
+        event_location = ""
+        for item in details:
+            lower = item.lower()
+            if lower.startswith("date:"):
+                fight_date = _clean(item.split(":", 1)[1])
+            elif lower.startswith("location:"):
+                event_location = _clean(item.split(":", 1)[1])
+        fight_rows = soup.select("tr.b-fight-details__table-row.b-fight-details__table-row__hover")
+        if not fight_rows:
+            fight_rows = [row for row in soup.select("tr[data-link]") if row.select("td")]
+        fights: list[dict[str, Any]] = []
+        stats_rows: list[dict[str, Any]] = []
+        fighters: dict[str, dict[str, Any]] = {}
+        enrichment: list[dict[str, Any]] = []
+        for index, tr in enumerate(fight_rows):
+            cells = tr.select("td")
+            if len(cells) < 2:
+                continue
+            statuses = [value.lower() for value in _cell_values(cells[0])]
+            names = _cell_values(cells[1])
+            names = [name for name in names[:2] if name]
+            if len(names) < 2:
+                continue
+            fight_url = tr.get("data-link") or ""
+            if fight_url.startswith("/"):
+                fight_url = "http://ufcstats.com" + fight_url
+            winner = ""
+            for status_index, status in enumerate(statuses[:2]):
+                if "win" in status and status_index < len(names):
+                    winner = names[status_index]
+                    break
+            weight_class = _clean(cells[6].get_text(" ", strip=True)) if len(cells) > 6 else "Unknown"
+            method = _clean(cells[7].get_text(" ", strip=True)) if len(cells) > 7 else ""
+            finish_round = _clean(cells[8].get_text(" ", strip=True)) if len(cells) > 8 else ""
+            finish_time = _clean(cells[9].get_text(" ", strip=True)) if len(cells) > 9 else ""
+            scheduled_rounds = 5 if ("title" in method.lower() or index == 0 and "vs" in event_name.lower()) else 3
+            fight_id = f"staged_{index}"
+            fight = {
+                "fight_id": fight_id,
+                "event_name": event_name,
+                "fight_date": fight_date,
+                "event_location": event_location,
+                "fighter_a": names[0],
+                "fighter_b": names[1],
+                "winner": winner,
+                "weight_class": weight_class or "Unknown",
+                "method": method,
+                "finish_round": finish_round,
+                "finish_time": finish_time,
+                "scheduled_rounds": scheduled_rounds,
+                "main_event": 1 if index == 0 else 0,
+                "source_url": fight_url,
+                "title_fight": 1 if scheduled_rounds == 5 else 0,
+            }
+            fights.append(fight)
+            enrichment.append(
+                {
+                    "fight_date": fight_date,
+                    "event": event_name,
+                    "fighter_a": names[0],
+                    "fighter_b": names[1],
+                    "weight_class": weight_class or "Unknown",
+                    "event_location": event_location,
+                    "main_event": fight["main_event"],
+                    "title_fight": fight["title_fight"],
+                    "scheduled_rounds": scheduled_rounds,
+                }
+            )
+            fighter_links = cells[1].select('a[href*="/fighter-details/"]')
+            for fighter_index, fighter_name in enumerate(names[:2]):
+                fighter_url = fighter_links[fighter_index].get("href") if fighter_index < len(fighter_links) else ""
+                fighters.setdefault(
+                    _normal(fighter_name),
+                    {
+                        "name": fighter_name,
+                        "stance": "",
+                        "height_in": "",
+                        "weight_lb": "",
+                        "reach_in": "",
+                        "date_of_birth": "",
+                        "record": "",
+                        "source_url": fighter_url or "",
+                    },
+                )
+            if len(cells) > 5:
+                kd_values = _cell_values(cells[2]) if len(cells) > 2 else ["", ""]
+                str_values = _cell_values(cells[3]) if len(cells) > 3 else ["", ""]
+                td_values = _cell_values(cells[4]) if len(cells) > 4 else ["", ""]
+                sub_values = _cell_values(cells[5]) if len(cells) > 5 else ["", ""]
+                for fighter_index, fighter_name in enumerate(names[:2]):
+                    opponent = names[1 - fighter_index]
+                    sig_landed, sig_attempted = _parse_landed_attempted(str_values[fighter_index] if fighter_index < len(str_values) else "")
+                    td_landed, td_attempted = _parse_landed_attempted(td_values[fighter_index] if fighter_index < len(td_values) else "")
+                    stats_rows.append(
+                        {
+                            "fight_id": fight_id,
+                            "source_url": fight_url,
+                            "fighter": fighter_name,
+                            "opponent": opponent,
+                            "knockdowns": _parse_numeric(kd_values[fighter_index] if fighter_index < len(kd_values) else ""),
+                            "sig_str_landed": sig_landed,
+                            "sig_str_attempted": sig_attempted,
+                            "takedowns_landed": td_landed,
+                            "takedowns_attempted": td_attempted,
+                            "submission_attempts": _parse_numeric(sub_values[fighter_index] if fighter_index < len(sub_values) else ""),
+                        }
+                    )
+        if fights:
+            diagnostics["parse_reason"] = "Parsed UFCStats event table."
+        elif diagnostics.get("browser_challenge_detected"):
+            diagnostics["parse_reason"] = "UFCStats returned a browser/JavaScript challenge page instead of an event table."
+        elif not diagnostics.get("ufcstats_table_marker_found"):
+            diagnostics["parse_reason"] = "No UFCStats fight table markers were found."
+        else:
+            diagnostics["parse_reason"] = "UFCStats table markers were present, but no valid fight rows were parsed."
+        diagnostics["parsed_fights"] = len(fights)
+        diagnostics["parsed_fight_stats"] = len(stats_rows)
+        diagnostics["parsed_fighters"] = len(fighters)
+        return fights, stats_rows, list(fighters.values()), enrichment, warnings, diagnostics
+
+
+class ManualCsvAdapter:
+    """Adapter for local CSV/HTML tables used as a safe manual fallback."""
+
+    def parse(self, source_path_or_url: str) -> tuple[
+        list[dict[str, Any]],
+        list[dict[str, Any]],
+        list[dict[str, Any]],
+        list[dict[str, Any]],
+        list[dict[str, Any]],
+        list[dict[str, Any]],
+        dict[str, Any],
+    ]:
+        frame = _read_generic_source(source_path_or_url)
+        fights, stats, fighters, scorecards, enrichment, odds = _generic_rows_from_frame(frame, source_path_or_url)
+        diagnostics = {
+            "source_attempted": "manual",
+            "url_requested": source_path_or_url,
+            "rows_read": int(len(frame)),
+            "parsed_fights": int(len(fights)),
+            "parse_reason": "Parsed manual source rows." if fights else "No manual rows could be mapped to fight schema.",
+        }
+        return fights, stats, fighters, scorecards, enrichment, odds, diagnostics
+
+
+class OddsApiAdapter:
+    """Optional odds adapter placeholder; active only when credentials are configured."""
+
+    def is_configured(self) -> bool:
+        return bool(getattr(settings, "odds_api_key", None))
+
+
+class BestFightOddsAdapter:
+    """Optional isolated odds adapter placeholder.
+
+    It is deliberately non-required so failures cannot break the local/free update workflow.
+    """
+
+    def is_configured(self) -> bool:
+        return False
+
+
+class SportsDataIOAdapter:
+    """Optional paid-source adapter placeholder; active only with SportsDataIO credentials."""
+
+    def is_configured(self) -> bool:
+        return bool(settings.sportsdataio_api_key)
 
 
 def _load_url_or_file(event_url: str) -> str:
@@ -405,77 +748,79 @@ def _generic_rows_from_frame(frame: pd.DataFrame, source_file: str) -> tuple[lis
     return fights, stats, list(fighters.values()), scorecards, enrichment, odds
 
 
-def _ufcstats_rows(event_url: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[str]]:
-    warnings: list[str] = []
-    scraper = UFCStatsScraper()
-    payload = scraper.scrape_event(event_url)
-    fights = payload.get("fights", [])
-    for index, fight in enumerate(fights):
-        fight["fight_id"] = fight.get("fight_id") or f"staged_{index}"
-        fight["main_event"] = 1 if index == 0 else 0
-        fight["title_fight"] = 1 if pd.to_numeric(pd.Series([fight.get("scheduled_rounds")]), errors="coerce").fillna(0).iloc[0] >= 5 else 0
-    stats_rows: list[dict[str, Any]] = []
-    fighter_rows: dict[str, dict[str, Any]] = {}
-    for fight in fights:
-        for name in [fight.get("fighter_a"), fight.get("fighter_b")]:
-            if _clean(name):
-                fighter_rows.setdefault(
-                    _normal(name),
-                    {
-                        "name": _clean(name),
-                        "stance": "",
-                        "height_in": "",
-                        "weight_lb": "",
-                        "reach_in": "",
-                        "date_of_birth": "",
-                        "record": "",
-                        "source_url": "",
-                    },
-                )
-        source_url = _clean(fight.get("source_url"))
-        if source_url:
-            try:
-                for stats in scraper.scrape_fight_stats(source_url):
-                    stats["fight_id"] = fight.get("fight_id")
-                    stats_rows.append(stats)
-            except Exception as exc:  # pragma: no cover - network/layout dependent
-                warnings.append(f"Could not parse fight stats for {source_url}: {type(exc).__name__}: {exc}")
-    enrichment = [
-        {
-            "fight_date": fight.get("fight_date", ""),
-            "event": fight.get("event_name", ""),
-            "fighter_a": fight.get("fighter_a", ""),
-            "fighter_b": fight.get("fighter_b", ""),
-            "weight_class": fight.get("weight_class", "Unknown"),
-            "event_location": fight.get("event_location", ""),
-            "main_event": fight.get("main_event", 0),
-            "title_fight": fight.get("title_fight", 0),
-            "scheduled_rounds": fight.get("scheduled_rounds", 3),
-        }
-        for fight in fights
-    ]
-    return fights, stats_rows, list(fighter_rows.values()), [], enrichment, [], warnings
+def _ufcstats_rows(
+    event_url: str,
+    event_html: str | Path | None = None,
+    staging_dir: Path | None = None,
+    save_raw_html: bool = False,
+) -> tuple[
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[str],
+    dict[str, Any],
+]:
+    adapter = UFCStatsAdapter()
+    html_source = str(event_html or event_url)
+    if event_html is not None:
+        path = Path(event_html)
+        if not path.exists():
+            raise InputDataError(f"UFCStats event HTML file not found: {path}")
+        html = path.read_text(encoding="utf-8")
+        diagnostics = adapter._diagnostics(html_source, html, status_code=None, final_url=str(path), source="event_html")
+    else:
+        html, diagnostics = adapter.fetch_event_html(event_url)
+    if save_raw_html and staging_dir is not None:
+        staging_dir.mkdir(parents=True, exist_ok=True)
+        raw_path = staging_dir / "raw_event_page.html"
+        raw_path.write_text(html, encoding="utf-8")
+        diagnostics["raw_html_saved_to"] = str(raw_path)
+    fights, stats_rows, fighter_rows, enrichment, warnings, diagnostics = adapter.parse_event_html(
+        html,
+        html_source,
+        diagnostics=diagnostics,
+    )
+    return fights, stats_rows, fighter_rows, [], enrichment, [], warnings, diagnostics
 
 
 def update_after_card(
     event_url: str,
     source: str = "auto",
     staging_dir: str | Path | None = None,
+    event_html: str | Path | None = None,
+    save_raw_html: bool = False,
 ) -> CardUpdateReport:
     staging = Path(staging_dir) if staging_dir else settings.raw_data_dir / "staging"
     normalized_source = source.strip().lower()
     warnings: list[str] = []
+    diagnostics: dict[str, Any] = {}
     if normalized_source == "auto":
-        normalized_source = "ufcstats" if "ufcstats.com" in event_url.lower() else "espn"
+        normalized_source = "ufcstats" if (event_html is not None or "ufcstats.com" in event_url.lower()) else "manual"
     if normalized_source == "ufcstats":
-        fights, stats, fighters, scorecards, enrichment, odds, warnings = _ufcstats_rows(event_url)
-    elif normalized_source == "espn":
-        frame = _read_generic_source(event_url)
-        fights, stats, fighters, scorecards, enrichment, odds = _generic_rows_from_frame(frame, event_url)
+        fights, stats, fighters, scorecards, enrichment, odds, warnings, diagnostics = _ufcstats_rows(
+            event_url=event_url,
+            event_html=event_html,
+            staging_dir=staging,
+            save_raw_html=save_raw_html,
+        )
+    elif normalized_source in {"espn", "manual"}:
+        fights, stats, fighters, scorecards, enrichment, odds, diagnostics = ManualCsvAdapter().parse(event_url)
+        diagnostics["source_attempted"] = normalized_source
     else:
-        raise InputDataError("--source must be one of: ufcstats, espn, auto.")
+        raise InputDataError("--source must be one of: ufcstats, espn, manual, auto.")
 
-    report = CardUpdateReport(event_url=event_url, source=normalized_source, staging_dir=staging, warnings=warnings)
+    if not fights:
+        warnings.append(diagnostics.get("parse_reason", "Parsing produced zero fights."))
+    report = CardUpdateReport(
+        event_url=event_url,
+        source=normalized_source,
+        staging_dir=staging,
+        warnings=warnings,
+        diagnostics=diagnostics,
+    )
     payloads = {
         "new_fights.csv": fights,
         "new_fight_stats.csv": stats,
@@ -874,6 +1219,9 @@ def run_rebuild_after_update() -> list[dict[str, Any]]:
     steps = [
         ["validate-card-update"],
         ["apply-card-update"],
+        ["enrich-fighter-profiles", "--source", "auto"],
+        ["validate-fighter-profile-enrichment"],
+        ["apply-fighter-profile-enrichment"],
         ["build-dataset", "--verbose"],
         ["train"],
         ["backtest", "--model-mode", "pure"],
@@ -902,13 +1250,16 @@ def run_rebuild_after_update() -> list[dict[str, Any]]:
 def prepare_upcoming_card(
     event_url: str,
     output_path: str | Path | None = None,
+    source: str = "auto",
 ) -> tuple[pd.DataFrame, Path]:
     output = Path(output_path) if output_path else settings.raw_data_dir / "staging" / "upcoming_card_predictions.csv"
-    source = "ufcstats" if "ufcstats.com" in event_url.lower() else "espn"
-    if source == "ufcstats":
-        scraper = UFCStatsScraper()
-        payload = scraper.scrape_event(event_url)
-        fights = payload.get("fights", [])
+    source_name = source.strip().lower()
+    if source_name == "auto":
+        source_name = "ufcstats" if "ufcstats.com" in event_url.lower() else "manual"
+    if source_name == "ufcstats":
+        fights, _, _, _, _, _, _, diagnostics = _ufcstats_rows(event_url=event_url)
+        if not fights:
+            raise InputDataError(f"UFCStats upcoming-card parser produced zero fights: {diagnostics.get('parse_reason')}")
         rows = [
             {
                 "fighter_a": fight.get("fighter_a", ""),

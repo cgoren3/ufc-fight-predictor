@@ -658,14 +658,26 @@ def load_scorecards(
 
 @app.command("update-after-card")
 def update_after_card(
-    event_url: str = typer.Option(..., "--event-url", help="Completed event URL or local CSV/HTML file."),
-    source: str = typer.Option("auto", "--source", help="Source parser: ufcstats, espn, or auto."),
+    event_url: str = typer.Option("", "--event-url", help="Completed event URL or local CSV/HTML file."),
+    event_html: Optional[Path] = typer.Option(None, "--event-html", help="Saved UFCStats event HTML to parse without a network request."),
+    source: str = typer.Option("auto", "--source", help="Source parser: ufcstats, manual, espn, or auto."),
     staging_dir: Path = typer.Option(settings.raw_data_dir / "staging", help="Staging output directory."),
+    save_raw_html: bool = typer.Option(False, "--save-raw-html", help="Save fetched UFCStats event HTML to staging/raw_event_page.html."),
 ) -> None:
     from ufc_predictor.card_update import update_after_card as run_update_after_card
 
+    if not event_url and event_html is None:
+        _runtime_error("Provide --event-url or --event-html.")
+    if not event_url and event_html is not None:
+        event_url = str(event_html)
     try:
-        report = run_update_after_card(event_url=event_url, source=source, staging_dir=staging_dir)
+        report = run_update_after_card(
+            event_url=event_url,
+            source=source,
+            staging_dir=staging_dir,
+            event_html=event_html,
+            save_raw_html=save_raw_html,
+        )
     except Exception as exc:
         _runtime_error(f"Post-card update failed:\n{type(exc).__name__}: {exc}")
     _print(f"Staged post-card update from {report.source}.")
@@ -674,6 +686,28 @@ def update_after_card(
         rows = report.rows_written.get(name)
         suffix = f" rows={rows}" if rows is not None else ""
         _print(f"- {name}: {path}{suffix}")
+    if report.diagnostics:
+        _print("Update diagnostics:")
+        for key in [
+            "source_attempted",
+            "url_requested",
+            "http_status_code",
+            "final_url",
+            "response_content_length",
+            "ufcstats_table_marker_found",
+            "fight_row_marker_found",
+            "browser_challenge_detected",
+            "page_title",
+            "event_name_detected",
+            "parse_reason",
+            "raw_html_saved_to",
+        ]:
+            if key in report.diagnostics:
+                _print(f"- {key}: {report.diagnostics.get(key)}")
+        if not report.rows_written.get("new_fights.csv"):
+            preview = report.diagnostics.get("body_preview")
+            if preview:
+                _print(f"- body_preview: {preview}")
     for warning in report.warnings:
         _print(f"[yellow]Warning: {warning}[/yellow]")
 
@@ -748,7 +782,6 @@ def enrich_fighter_profiles(
     fighters_path: Path = typer.Option(settings.raw_data_dir / "imports" / "fighters.csv", help="fighters.csv to improve."),
     source_dir: Path = typer.Option(settings.raw_data_dir / "enrichment_sources", help="External source CSV directory."),
     output_path: Path = typer.Option(settings.raw_data_dir / "imports" / "fighter_profile_enrichment.csv", help="Profile enrichment CSV output."),
-    apply: bool = typer.Option(True, "--apply/--no-apply", help="Update missing fields in fighters.csv after validation."),
 ) -> None:
     from ufc_predictor.fighter_profiles import enrich_fighter_profiles as run_enrich_fighter_profiles
 
@@ -758,21 +791,56 @@ def enrich_fighter_profiles(
             fighters_path=fighters_path,
             source_dir=source_dir,
             output_path=output_path,
-            apply=apply,
         )
     except InputDataError as exc:
         _runtime_error(f"Fighter profile enrichment failed:\n{exc}")
+    _print_profile_report(report)
+
+
+def _print_profile_report(report) -> None:
     _print(f"Fighters read: {report.fighters_read}")
     _print(f"Profile enrichment rows written: {report.enrichment_rows}")
-    _print(f"Fighters updated: {report.fighters_updated}")
+    coverage = report.coverage or {}
+    if coverage:
+        _print("Coverage:")
+        for key in [
+            "existing_fighters_count",
+            "existing_reach_coverage_before",
+            "existing_height_coverage_before",
+            "existing_stance_coverage_before",
+            "existing_dob_coverage_before",
+            "enrichment_rows_with_reach",
+            "enrichment_rows_with_height",
+            "enrichment_rows_with_stance",
+            "enrichment_rows_with_dob",
+            "matched_fighters",
+            "unmatched_enrichment_rows",
+            "reach_coverage_after",
+            "height_coverage_after",
+            "stance_coverage_after",
+            "dob_coverage_after",
+        ]:
+            if key in coverage:
+                _print(f"- {key}: {coverage.get(key)}")
+    _print(f"Fighters with proposed/applied updates: {report.fighters_updated}")
     _print(f"Output path: {report.output_path}")
     _print(f"Report path: {report.report_path}")
+    if getattr(report, "backup_dir", None):
+        _print(f"Backup created: {report.backup_dir}")
     _print("Fields updated:")
     if report.fields_updated:
         for field, count in sorted(report.fields_updated.items()):
             _print(f"- {field}: {count}")
     else:
         _print("- none")
+    if report.examples_filled:
+        _print("Examples filled:")
+        for example in report.examples_filled[:5]:
+            _print(f"- {example}")
+    if report.unmatched_examples:
+        _print("Unmatched examples:")
+        for name in report.unmatched_examples[:5]:
+            _print(f"- {name}")
     if report.source_files_used:
         _print("Source files used:")
         for path in report.source_files_used:
@@ -781,9 +849,65 @@ def enrich_fighter_profiles(
         _print(f"[yellow]Warning: {warning}[/yellow]")
 
 
+@app.command("validate-fighter-profile-enrichment")
+def validate_fighter_profile_enrichment(
+    fighters_path: Path = typer.Option(settings.raw_data_dir / "imports" / "fighters.csv", help="fighters.csv to validate against."),
+    enrichment_path: Path = typer.Option(settings.raw_data_dir / "imports" / "fighter_profile_enrichment.csv", help="Profile enrichment CSV."),
+    overwrite: bool = typer.Option(False, "--overwrite", help="Report updates that would overwrite non-empty values."),
+) -> None:
+    from ufc_predictor.fighter_profiles import validate_fighter_profile_enrichment as run_validate_profile_enrichment
+
+    try:
+        report = run_validate_profile_enrichment(
+            fighters_path=fighters_path,
+            enrichment_path=enrichment_path,
+            overwrite=overwrite,
+        )
+    except InputDataError as exc:
+        _runtime_error(f"Fighter profile enrichment validation failed:\n{exc}")
+    _print_profile_report(report)
+    _print("Fighter profile enrichment validation complete.")
+
+
+@app.command("apply-fighter-profile-enrichment")
+def apply_fighter_profile_enrichment(
+    fighters_path: Path = typer.Option(settings.raw_data_dir / "imports" / "fighters.csv", help="fighters.csv to update."),
+    enrichment_path: Path = typer.Option(settings.raw_data_dir / "imports" / "fighter_profile_enrichment.csv", help="Profile enrichment CSV."),
+    overwrite: bool = typer.Option(False, "--overwrite", help="Overwrite non-empty existing values."),
+) -> None:
+    from ufc_predictor.fighter_profiles import apply_fighter_profile_enrichment as run_apply_profile_enrichment
+
+    try:
+        report = run_apply_profile_enrichment(
+            fighters_path=fighters_path,
+            enrichment_path=enrichment_path,
+            overwrite=overwrite,
+        )
+    except InputDataError as exc:
+        _runtime_error(f"Fighter profile enrichment apply failed:\n{exc}")
+    _print_profile_report(report)
+    _print("Fighter profile enrichment applied.")
+
+
+@app.command("import-fighter-profile-csv")
+def import_fighter_profile_csv(
+    file: Path = typer.Option(..., "--file", help="Manual fighter profile CSV."),
+    output_path: Path = typer.Option(settings.raw_data_dir / "imports" / "fighter_profile_enrichment.csv", "--output", help="Normalized profile enrichment output."),
+    append: bool = typer.Option(True, "--append/--replace", help="Append to existing enrichment CSV and dedupe by fighter name."),
+) -> None:
+    from ufc_predictor.fighter_profiles import import_fighter_profile_csv as run_import_profile_csv
+
+    try:
+        frame, path = run_import_profile_csv(file=file, output_path=output_path, append=append)
+    except InputDataError as exc:
+        _runtime_error(f"Manual fighter profile import failed:\n{exc}")
+    _print(f"Imported {len(frame)} fighter profile enrichment rows to {path}")
+
+
 @app.command("prepare-upcoming-card")
 def prepare_upcoming_card(
     event_url: str = typer.Option(..., "--event-url", help="Upcoming event URL or local CSV/HTML file."),
+    source: str = typer.Option("auto", "--source", help="Source parser: ufcstats, manual, espn, or auto."),
     output_path: Path = typer.Option(
         settings.raw_data_dir / "staging" / "upcoming_card_predictions.csv",
         "--output",
@@ -793,7 +917,7 @@ def prepare_upcoming_card(
     from ufc_predictor.card_update import prepare_upcoming_card as run_prepare_upcoming_card
 
     try:
-        frame, path = run_prepare_upcoming_card(event_url=event_url, output_path=output_path)
+        frame, path = run_prepare_upcoming_card(event_url=event_url, output_path=output_path, source=source)
     except Exception as exc:
         _runtime_error(f"Upcoming card preparation failed:\n{type(exc).__name__}: {exc}")
     _print(f"Wrote upcoming-card prediction template with {len(frame)} fights to {path}")

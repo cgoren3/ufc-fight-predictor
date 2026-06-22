@@ -103,6 +103,8 @@ def _slug(value: str) -> str:
 def _clean_text(value: Any) -> str:
     if value is None:
         return ""
+    if hasattr(value, "get_text"):
+        value = value.get_text(" ", strip=True)
     return " ".join(str(value).replace("\n", " ").split())
 
 
@@ -369,7 +371,7 @@ class UFCStatsScraper:
         return {
             "name": profile.get("name", ""),
             "stance": profile.get("stance", ""),
-            "height_in": profile.get("height", ""),
+            "height_in": profile.get("height", "").replace('"', "").strip(),
             "weight_lb": profile.get("weight", "").replace("lbs.", "").strip(),
             "reach_in": profile.get("reach", "").replace('"', "").strip(),
             "date_of_birth": profile.get("dob", ""),
